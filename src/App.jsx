@@ -137,11 +137,16 @@ function App() {
   }, [clearHintTimers])
 
   const handleStart = () => {
-    // iOS Safari requires user interaction before audio plays
-    // Play a silent audio to unlock the audio context
-    const silence = new Audio('/audio/De.m4a')
-    silence.volume = 0
-    silence.play().catch(() => {})
+    // iOS Safari requires user interaction to unlock audio context
+    // Create and play a tiny silent buffer — no audible sound
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)()
+      const buffer = ctx.createBuffer(1, 1, 22050)
+      const source = ctx.createBufferSource()
+      source.buffer = buffer
+      source.connect(ctx.destination)
+      source.start(0)
+    } catch (e) { /* ignore */ }
 
     setGameStarted(true)
     setLevel(0)
