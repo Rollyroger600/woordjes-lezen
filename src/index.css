@@ -1,0 +1,99 @@
+@import "tailwindcss";
+
+/* Word block colors - cheerful, distinct, consistent */
+:root {
+  --color-de: #FF6B6B;
+  --color-het: #4ECDC4;
+  --color-een: #FFE66D;
+  --color-en: #A8E6CF;
+  --color-is: #FF8B94;
+  --color-in: #7EC8E3;
+  --color-op: #C3AED6;
+  --color-aan: #FFB347;
+  --color-of: #87CEEB;
+  --color-bij: #DDA0DD;
+  --color-dit: #98D8C8;
+  --color-dat: #F7DC6F;
+  --color-ik: #F1948A;
+  --color-je: #82E0AA;
+  --color-wij: #AED6F1;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: 'OpenDyslexic', sans-serif;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+/* Shake animation for wrong answers */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-8px); }
+  20%, 40%, 60%, 80% { transform: translateX(8px); }
+}
+
+.animate-shake {
+  animation: shake 0.5s ease-in-out;
+}
+
+/* Subtle wobble hint (level 1) */
+@keyframes wobble-subtle {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-3deg); }
+  75% { transform: rotate(3deg); }
+}
+
+.animate-wobble-subtle {
+  animation: wobble-subtle 0.4s ease-in-out 3;
+}
+
+/* Strong wobble hint (level 2) + glow */
+@keyframes wobble-strong {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  25% { transform: rotate(-5deg) scale(1.05); }
+  75% { transform: rotate(5deg) scale(1.05); }
+}
+
+.animate-wobble-strong {
+  animation: wobble-strong 0.4s ease-in-out infinite;
+  box-shadow: 0 0 25px rgba(255, 255, 255, 0.7), 0 0 50px rgba(255, 255, 255, 0.3);
+}
+
+/* Pop animation for correct answer */
+@keyframes pop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+.animate-pop {
+  animation: pop 0.3s ease-in-out;
+}
+
+/* Star appear animation */
+@keyframes star-appear {
+  0% { transform: scale(0) rotate(-180deg); opacity: 0; }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+.animate-star {
+  display: inline-block;
+  animation: star-appear 0.5s ease-out forwards;
+}
+
+/* Gentle pulse for start button */
+@keyframes pulse-gentle {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+.animate-pulse-gentle {
+  animation: pulse-gentle 2s ease-in-out infinite;
+}
