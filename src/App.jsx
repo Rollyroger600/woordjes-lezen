@@ -37,18 +37,36 @@ function pickWords(level, count, mustInclude) {
   return shuffleArray([...picked])
 }
 
+// Audio cache to avoid creating new Audio objects each time
+const audioCache = {}
+
 function speak(text, onEnd) {
-  window.speechSynthesis.cancel()
-  const utter = new SpeechSynthesisUtterance(text)
-  utter.lang = 'nl-NL'
-  utter.rate = 0.8
-  utter.pitch = 1.1
-  // Try to find a Dutch voice
-  const voices = window.speechSynthesis.getVoices()
-  const nlVoice = voices.find(v => v.lang.startsWith('nl'))
-  if (nlVoice) utter.voice = nlVoice
-  if (onEnd) utter.onend = onEnd
-  window.speechSynthesis.speak(utter)
+  // Capitalize first letter to match filenames (De.m4a, Het.m4a, etc.)
+  const filename = text.charAt(0).toUpperCase() + text.slice(1)
+  const audioSrc = `/audio/${filename}.m4a`
+
+  // Stop any currently playing audio
+  Object.values(audioCache).forEach(a => { a.pause(); a.currentTime = 0 })
+
+  if (!audioCache[text]) {
+    audioCache[text] = new Audio(audioSrc)
+  }
+  const audio = audioCache[text]
+  audio.currentTime = 0
+  if (onEnd) audio.onended = onEnd
+  audio.play().catch(() => {
+    // Fallback to Web Speech API if audio file fails
+    window.speechSynthesis.cancel()
+    const utter = new SpeechSynthesisUtterance(text)
+    utter.lang = 'nl-NL'
+    utter.rate = 0.8
+    utter.pitch = 1.1
+    const voices = window.speechSynthesis.getVoices()
+    const nlVoice = voices.find(v => v.lang.startsWith('nl'))
+    if (nlVoice) utter.voice = nlVoice
+    if (onEnd) utter.onend = onEnd
+    window.speechSynthesis.speak(utter)
+  })
 }
 
 function App() {
@@ -119,12 +137,11 @@ function App() {
   }, [clearHintTimers])
 
   const handleStart = () => {
-    // iOS Safari requires user interaction before speech works
-    // Trigger a silent utterance to unlock audio
-    const unlock = new SpeechSynthesisUtterance('')
-    unlock.lang = 'nl-NL'
-    unlock.volume = 0
-    window.speechSynthesis.speak(unlock)
+    // iOS Safari requires user interaction before audio plays
+    // Play a silent audio to unlock the audio context
+    const silence = new Audio('/audio/De.m4a')
+    silence.volume = 0
+    silence.play().catch(() => {})
 
     setGameStarted(true)
     setLevel(0)
