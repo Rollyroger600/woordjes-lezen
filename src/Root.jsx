@@ -6,8 +6,10 @@ import App from './App'
 import Module2 from './Module2'
 import Module3 from './Module3'
 
+const font = { fontFamily: 'OpenDyslexic, sans-serif' }
+
 export default function Root() {
-  const [screen, setScreen] = useState('profiles')
+  const [screen, setScreen] = useState('splash')
   const [profile, setProfile] = useState(null)
   const [progressMap, setProgressMap] = useState({})
 
@@ -67,6 +69,25 @@ export default function Root() {
     } catch (_) {
       // Netwerk-fout: ga door met lokale state
     }
+  }
+
+  if (screen === 'splash') {
+    return (
+      <div
+        className="h-full flex flex-col items-center justify-center p-6 select-none cursor-pointer"
+        onClick={() => setScreen('profiles')}
+        onTouchEnd={() => setScreen('profiles')}
+      >
+        <div className="text-8xl mb-6">📖</div>
+        <h1 className="text-white text-4xl font-bold mb-3 text-center" style={font}>
+          Woordjes Lezen
+        </h1>
+        <p className="text-white/60 text-lg mb-12" style={font}>Leren lezen is leuk!</p>
+        <div className="bg-white/20 hover:bg-white/30 rounded-3xl px-10 py-5 transition-colors">
+          <span className="text-white text-xl font-bold" style={font}>Tik om te starten</span>
+        </div>
+      </div>
+    )
   }
 
   if (screen === 'profiles') {
