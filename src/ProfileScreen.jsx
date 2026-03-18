@@ -79,6 +79,10 @@ export default function ProfileScreen({ onSelect }) {
     stopAll()
     if (screen === 'list') {
       speechRef.current = setTimeout(() => speakItem('profile-select', 'Wie gaat er spelen? Klik je eigen naam aan of maak een nieuw account aan door op het plusje te klikken'), 400)
+    } else if (screen === 'create-name') {
+      speechRef.current = setTimeout(() => speakItem('profile-create-name', 'Hoe heet je? Typ je naam en klik op volgende'), 300)
+    } else if (screen === 'create-avatar') {
+      speechRef.current = setTimeout(() => speakItem('profile-create-avatar', 'Kies een plaatje dat je leuk vindt!'), 300)
     } else if (screen === 'create-pin') {
       speechRef.current = setTimeout(() => speakItem('profile-pin-create', 'Vul hier een pincode in met 3 cijfers en onthoud deze goed'), 300)
     }
@@ -294,7 +298,7 @@ export default function ProfileScreen({ onSelect }) {
     return (
       <div className="h-full flex items-center justify-center p-6 overflow-y-auto">
         <div className="bg-white rounded-3xl p-8 w-full max-w-sm shadow-xl">
-          <h2 className="text-xl font-bold text-gray-700 mb-1 text-center" style={font}>Kies een dier</h2>
+          <h2 className="text-xl font-bold text-gray-700 mb-1 text-center" style={font}>Kies een plaatje!</h2>
           <p className="text-gray-400 text-sm text-center mb-5" style={font}>{newName}</p>
           <div className="grid grid-cols-5 gap-2 mb-6">
             {AVATARS.map(a => (

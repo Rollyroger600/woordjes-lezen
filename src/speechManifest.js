@@ -14,6 +14,18 @@ export const SPEECH_ITEMS = [
     usedIn: 'Profiel keuze — welkomstscherm',
   },
   {
+    id: 'profile-create-name',
+    text: 'Hoe heet je? Typ je naam en klik op volgende',
+    category: 'Instructies',
+    usedIn: 'Profiel aanmaken — naam invoeren',
+  },
+  {
+    id: 'profile-create-avatar',
+    text: 'Kies een plaatje dat je leuk vindt!',
+    category: 'Instructies',
+    usedIn: 'Profiel aanmaken — avatar kiezen',
+  },
+  {
     id: 'profile-pin-login',
     text: 'Vul hier je pincode in',
     category: 'Instructies',
