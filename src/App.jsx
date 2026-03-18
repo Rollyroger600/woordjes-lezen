@@ -156,7 +156,6 @@ function App({ profile = null, savedProgress = null, onProgressUpdate = null, on
     setAllDone(false)
     setRoundCount(0)
     setShowMiniGame(false)
-    setWarmupMode(false)
 
     setTimeout(() => {
       speakItem('instr-module1-start', 'Welk woord hoor je? Tik op het goede woord!', {
