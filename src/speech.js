@@ -9,6 +9,34 @@ const blobCache = {}   // id → blob URL (eenmalig gefetcht)
 const audioCache = {}  // id → Audio element (hergebruikt)
 let generation = 0     // voorkomt dat stale fetches nog afspelen
 
+// ---- Audio unlock: browsers blokkeren audio vóór eerste user gesture ----
+let unlockResolve
+const audioUnlocked = new Promise(r => { unlockResolve = r })
+let isUnlocked = false
+
+function handleUnlock() {
+  if (isUnlocked) return
+  isUnlocked = true
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)()
+    const buf = ctx.createBuffer(1, 1, 22050)
+    const src = ctx.createBufferSource()
+    src.buffer = buf; src.connect(ctx.destination); src.start(0)
+  } catch (_) {}
+  try {
+    const u = new SpeechSynthesisUtterance('')
+    u.volume = 0
+    window.speechSynthesis.speak(u)
+  } catch (_) {}
+  unlockResolve()
+  ;['touchstart', 'click', 'keydown'].forEach(e =>
+    document.removeEventListener(e, handleUnlock, true)
+  )
+}
+;['touchstart', 'click', 'keydown'].forEach(e =>
+  document.addEventListener(e, handleUnlock, { capture: true })
+)
+
 function stopAll() {
   generation++
   window.speechSynthesis.cancel()
@@ -59,13 +87,16 @@ export function speakItem(id, text, { onEnd, ttsRate = 0.85 } = {}) {
   stopAll()
   const gen = generation
 
-  loadBlob(`/audio/studio/${id}.webm`).then(url => {
+  audioUnlocked.then(() => {
     if (gen !== generation) return
-    if (!url) throw new Error('no file')
-    return playBlob(id, url, onEnd)
-  }).catch(() => {
-    if (gen !== generation) return
-    tts(text, { onEnd, rate: ttsRate })
+    return loadBlob(`/audio/studio/${id}.webm`).then(url => {
+      if (gen !== generation) return
+      if (!url) throw new Error('no file')
+      return playBlob(id, url, onEnd)
+    }).catch(() => {
+      if (gen !== generation) return
+      tts(text, { onEnd, rate: ttsRate })
+    })
   })
 }
 
@@ -78,21 +109,24 @@ export function speakWord(word, onEnd) {
   const gen = generation
   const id = `woord-${word}`
 
-  loadBlob(`/audio/studio/${id}.webm`).then(url => {
+  audioUnlocked.then(() => {
     if (gen !== generation) return
-    if (!url) throw new Error('no studio')
-    return playBlob(id, url, onEnd)
-  }).catch(() => {
-    if (gen !== generation) return
-    const legacyPath = `/audio/${word.charAt(0).toUpperCase() + word.slice(1)}.m4a`
-    return loadBlob(legacyPath).then(url => {
+    return loadBlob(`/audio/studio/${id}.webm`).then(url => {
       if (gen !== generation) return
-      if (!url) throw new Error('no legacy')
-      return playBlob(`legacy-${word}`, url, onEnd)
+      if (!url) throw new Error('no studio')
+      return playBlob(id, url, onEnd)
+    }).catch(() => {
+      if (gen !== generation) return
+      const legacyPath = `/audio/${word.charAt(0).toUpperCase() + word.slice(1)}.m4a`
+      return loadBlob(legacyPath).then(url => {
+        if (gen !== generation) return
+        if (!url) throw new Error('no legacy')
+        return playBlob(`legacy-${word}`, url, onEnd)
+      })
+    }).catch(() => {
+      if (gen !== generation) return
+      tts(word, { onEnd })
     })
-  }).catch(() => {
-    if (gen !== generation) return
-    tts(word, { onEnd })
   })
 }
 
@@ -105,13 +139,16 @@ export function speakLetter(letter, onEnd) {
   const gen = generation
   const id = `letter-${letter}`
 
-  loadBlob(`/audio/studio/${id}.webm`).then(url => {
+  audioUnlocked.then(() => {
     if (gen !== generation) return
-    if (!url) throw new Error('no file')
-    return playBlob(id, url, onEnd)
-  }).catch(() => {
-    if (gen !== generation) return
-    tts(letter, { onEnd, rate: 0.7 })
+    return loadBlob(`/audio/studio/${id}.webm`).then(url => {
+      if (gen !== generation) return
+      if (!url) throw new Error('no file')
+      return playBlob(id, url, onEnd)
+    }).catch(() => {
+      if (gen !== generation) return
+      tts(letter, { onEnd, rate: 0.7 })
+    })
   })
 }
 
