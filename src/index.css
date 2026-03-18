@@ -119,3 +119,18 @@ body {
   display: inline-block;
   animation: flame-pulse 0.8s ease-in-out infinite;
 }
+
+/* Frog jump animation for mini-game */
+@keyframes frog-jump {
+  0% { transform: translateY(0) scale(1); }
+  40% { transform: translateY(-60px) scale(1.2); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+/* Star fall animation for mini-game */
+@keyframes star-fall {
+  0% { top: -10%; opacity: 0; transform: rotate(0deg); }
+  10% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { top: 95%; opacity: 0; transform: rotate(360deg); }
+}

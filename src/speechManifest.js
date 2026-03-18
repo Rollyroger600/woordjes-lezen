@@ -58,6 +58,18 @@ export const SPEECH_ITEMS = [
     usedIn: 'Vlinderspelletje — intro',
   },
   {
+    id: 'instr-kikkers',
+    text: 'Tik op de kikkers! Zo snel mogelijk!',
+    category: 'Instructies',
+    usedIn: 'Kikkerspelletje — intro',
+  },
+  {
+    id: 'instr-sterren',
+    text: 'Vang de sterren! Tik erop voordat ze vallen!',
+    category: 'Instructies',
+    usedIn: 'Sterrenspelletje — intro',
+  },
+  {
     id: 'instr-rijmen-start',
     text: 'Welk plaatje rijmt? Tik op het goede plaatje!',
     category: 'Instructies',

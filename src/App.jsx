@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import confetti from 'canvas-confetti'
-import ButterflyGame from './ButterflyGame'
-import { speakItem, speakWord, stopAll } from './speech'
+import { pickMiniGame } from './MiniGamePicker'
+import { speakItem, speakWord } from './speech'
 
 const LEVELS = [
   ['de', 'het', 'een'],
@@ -39,6 +39,15 @@ function pickWords(level, count, mustInclude) {
   return shuffleArray([...picked])
 }
 
+// How many levels to step back given days since last play
+function warmupStepsBack(lastPlayedDate) {
+  if (!lastPlayedDate) return 0
+  const today = new Date().toISOString().split('T')[0]
+  if (lastPlayedDate === today) return 0
+  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0]
+  return lastPlayedDate === yesterday ? 1 : 2
+}
+
 
 function App({ profile = null, savedProgress = null, onProgressUpdate = null, onBack = null }) {
   const [gameStarted, setGameStarted] = useState(false)
@@ -60,17 +69,8 @@ function App({ profile = null, savedProgress = null, onProgressUpdate = null, on
   // Blok van 10 vragen
   const [roundCount, setRoundCount] = useState(0)
   const [showMiniGame, setShowMiniGame] = useState(false)
+  const [MiniGameComponent, setMiniGameComponent] = useState(null)
   const nextRoundAfterGameRef = useRef(null)
-
-  // Opwarmer state
-  const [warmupMode, setWarmupMode] = useState(false)
-  const [warmupCorrectStreak, setWarmupCorrectStreak] = useState(0)
-  const [warmupCorrectTotal, setWarmupCorrectTotal] = useState(0)
-  const [warmupDone, setWarmupDone] = useState(false)
-  const warmupLevelRef = useRef(0)
-  const warmupCountRef = useRef(2)
-  const savedLevelRef = useRef(0)
-  const savedCountRef = useRef(2)
 
   const hintTimerRef = useRef(null)
   const hint2TimerRef = useRef(null)
@@ -134,46 +134,33 @@ function App({ profile = null, savedProgress = null, onProgressUpdate = null, on
     } catch (e) { /* ignore */ }
 
     // Laad voortgang uit savedProgress als beschikbaar
-    const startLevel = savedProgress?.current_level ?? 0
-    const startCount = savedProgress?.words_visible ?? 2
+    let startLevel = savedProgress?.current_level ?? 0
+    let startCount = savedProgress?.words_visible ?? 2
     const startStars = savedProgress?.total_stars ?? 0
-    const startStreak = savedProgress?.consecutive_correct ?? 0
-    const startErrorStreak = savedProgress?.consecutive_wrong ?? 0
+
+    // Warmup: stap terug op basis van dagen sinds laatste sessie
+    const lastPlayed = savedProgress?.updated_at?.split('T')[0] ?? null
+    const steps = warmupStepsBack(lastPlayed)
+    if (steps > 0 && startStars > 0) {
+      startLevel = Math.max(0, startLevel - steps)
+      startCount = 2
+    }
 
     setGameStarted(true)
     setLevel(startLevel)
     setVisibleCount(startCount)
-    setStreak(startStreak)
-    setErrorStreak(startErrorStreak)
+    setStreak(0)
+    setErrorStreak(0)
     setStars(startStars)
     setStarProgress(0)
     setAllDone(false)
     setRoundCount(0)
     setShowMiniGame(false)
-
-    // Spreek instructie uit, START pas daarna de eerste ronde
-    let wLevel = startLevel, wCount = startCount
-    if (startStars > 0) {
-      wLevel = Math.max(0, startLevel - 1)
-      wCount = Math.max(2, startCount - 1)
-      warmupLevelRef.current = wLevel
-      warmupCountRef.current = wCount
-      savedLevelRef.current = startLevel
-      savedCountRef.current = startCount
-      setWarmupMode(true)
-      setWarmupCorrectStreak(0)
-      setWarmupCorrectTotal(0)
-      setWarmupDone(false)
-    } else {
-      setWarmupMode(false)
-    }
-
-    const firstRoundLevel = startStars > 0 ? wLevel : startLevel
-    const firstRoundCount = startStars > 0 ? wCount : startCount
+    setWarmupMode(false)
 
     setTimeout(() => {
       speakItem('instr-module1-start', 'Welk woord hoor je? Tik op het goede woord!', {
-        onEnd: () => setTimeout(() => startNewRound(firstRoundLevel, firstRoundCount), 300),
+        onEnd: () => setTimeout(() => startNewRound(startLevel, startCount), 300),
       })
     }, 200)
   }
@@ -185,61 +172,9 @@ function App({ profile = null, savedProgress = null, onProgressUpdate = null, on
     startHintTimers(targetWord)
   }
 
-  // Opwarmer antwoord afhandelen
-  const handleWarmupTap = useCallback((word) => {
-    if (word === targetWord) {
-      clearHintTimers()
-      setPopWord(word)
-      setTransitioning(true)
-      confetti({
-        particleCount: 60,
-        spread: 60,
-        origin: { y: 0.6 },
-        colors: ['#FF6B6B', '#4ECDC4', '#FFE66D'],
-      })
-
-      setWarmupCorrectStreak(prev => {
-        const newStreak = prev + 1
-        setWarmupCorrectTotal(total => {
-          const newTotal = total + 1
-          const done = newStreak >= 3 || newTotal >= 5
-          if (done) {
-            setWarmupDone(true)
-            setTimeout(() => {
-              setWarmupMode(false)
-              setWarmupDone(false)
-              setPopWord(null)
-              setTransitioning(false)
-              startNewRound(savedLevelRef.current, savedCountRef.current)
-            }, 1800)
-          } else {
-            setTimeout(() => {
-              setPopWord(null)
-              setTransitioning(false)
-              startNewRound(warmupLevelRef.current, warmupCountRef.current)
-            }, 800)
-          }
-          return newTotal
-        })
-        return newStreak
-      })
-    } else {
-      setShakeWord(word)
-      setWarmupCorrectStreak(0)
-      setTimeout(() => speakWord(targetWord), 500)
-      setTimeout(() => setShakeWord(null), 500)
-    }
-  }, [targetWord, clearHintTimers, startNewRound])
-
   const handleWordTap = (word) => {
     if (transitioning) return
     resetInteraction()
-
-    // Opwarmer modus
-    if (warmupMode) {
-      handleWarmupTap(word)
-      return
-    }
 
     if (word === targetWord) {
       // Correct!
@@ -331,8 +266,9 @@ function App({ profile = null, savedProgress = null, onProgressUpdate = null, on
         setPopWord(null)
         setTransitioning(false)
         if (newRoundCount > 0 && newRoundCount % 10 === 0) {
-          // Mini-game na 10 vragen
+          // Mini-game na 10 vragen — kies random
           nextRoundAfterGameRef.current = { level: nextLevel, count: nextCount }
+          setMiniGameComponent(() => pickMiniGame())
           setShowMiniGame(true)
         } else {
           startNewRound(nextLevel, nextCount)
@@ -346,12 +282,27 @@ function App({ profile = null, savedProgress = null, onProgressUpdate = null, on
       setErrorStreak(newErrorStreak)
       setStreak(0)
 
-      // After 2 errors in a row, remove a word (min 2)
+      // Step-back logica (zelfde patroon als Module 2)
       let nextCount = visibleCount
-      if (newErrorStreak >= 2 && visibleCount > 2) {
+      let nextLevel = level
+      let didChange = false
+
+      if (newErrorStreak >= 3 && visibleCount <= 2) {
+        // 3+ fouten op minimum → level terug
+        if (level > 0) {
+          nextLevel = level - 1
+          nextCount = 2
+          setLevel(nextLevel)
+          setVisibleCount(nextCount)
+          setErrorStreak(0)
+          didChange = true
+        }
+      } else if (newErrorStreak >= 2 && visibleCount > 2) {
+        // 2 fouten → woord minder
         nextCount = visibleCount - 1
         setVisibleCount(nextCount)
         setErrorStreak(0)
+        didChange = true
       }
 
       // Repeat the word
@@ -361,7 +312,7 @@ function App({ profile = null, savedProgress = null, onProgressUpdate = null, on
       // Voortgang opslaan
       if (onProgressUpdate) {
         onProgressUpdate({
-          current_level: level,
+          current_level: nextLevel,
           words_visible: nextCount,
           total_stars: stars,
           consecutive_correct: 0,
@@ -369,12 +320,12 @@ function App({ profile = null, savedProgress = null, onProgressUpdate = null, on
         })
       }
 
-      // If count changed, start new round with fewer words
-      if (nextCount !== visibleCount) {
+      // If difficulty changed, start new round
+      if (didChange) {
         setTransitioning(true)
         setTimeout(() => {
           setTransitioning(false)
-          startNewRound(level, nextCount)
+          startNewRound(nextLevel, nextCount)
         }, 1200)
       }
     }
@@ -431,9 +382,10 @@ function App({ profile = null, savedProgress = null, onProgressUpdate = null, on
   }
 
   // Mini-game na 10 vragen
-  if (showMiniGame) {
+  if (showMiniGame && MiniGameComponent) {
+    const GameComp = MiniGameComponent
     return (
-      <ButterflyGame
+      <GameComp
         onFinish={() => {
           setShowMiniGame(false)
           const next = nextRoundAfterGameRef.current
@@ -504,17 +456,11 @@ function App({ profile = null, savedProgress = null, onProgressUpdate = null, on
         </div>
       </div>
 
-      {/* Level indicator / opwarmer banner */}
+      {/* Level indicator */}
       <div className="text-center">
-        {warmupMode ? (
-          <span className="text-yellow-300 text-sm font-bold" style={{ fontFamily: 'OpenDyslexic, sans-serif' }}>
-            {warmupDone ? 'Je weet het nog! ⭐' : 'Even opwarmen! 🔥'}
-          </span>
-        ) : (
-          <span className="text-white/60 text-sm" style={{ fontFamily: 'OpenDyslexic, sans-serif' }}>
-            Level {level + 1}
-          </span>
-        )}
+        <span className="text-white/60 text-sm" style={{ fontFamily: 'OpenDyslexic, sans-serif' }}>
+          Level {level + 1}
+        </span>
       </div>
 
       {/* Home knop */}

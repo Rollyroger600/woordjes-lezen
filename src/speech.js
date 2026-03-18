@@ -62,6 +62,9 @@ async function loadBlob(path) {
   if (blobCache[path]) return blobCache[path]
   const res = await fetch(path)
   if (!res.ok) return null
+  // Check content-type: Vite SPA fallback retourneert text/html voor niet-bestaande bestanden
+  const ct = res.headers.get('content-type') || ''
+  if (!ct.startsWith('audio/') && !ct.startsWith('application/octet-stream')) return null
   const blob = await res.blob()
   const url = URL.createObjectURL(blob)
   blobCache[path] = url

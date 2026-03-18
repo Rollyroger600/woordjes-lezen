@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from 'react'
 import confetti from 'canvas-confetti'
-import ButterflyGame from './ButterflyGame'
+import { pickMiniGame } from './MiniGamePicker'
 import { speakItem, speakWord } from './speech'
 
 // Spreek "Welk plaatje rijmt op" + [woord] achter elkaar uit
@@ -53,6 +53,7 @@ export default function Module3({ profile = null, savedProgress = null, onProgre
   const [allDone, setAllDone] = useState(false)
   const [roundCount, setRoundCount] = useState(0)
   const [showMiniGame, setShowMiniGame] = useState(false)
+  const [MiniGameComponent, setMiniGameComponent] = useState(null)
 
   const hintTimerRef = useRef(null)
   const hint2TimerRef = useRef(null)
@@ -184,6 +185,7 @@ export default function Module3({ profile = null, savedProgress = null, onProgre
         setTransitioning(false)
         if (newRoundCount % 10 === 0) {
           nextRoundAfterGameRef.current = true
+          setMiniGameComponent(() => pickMiniGame())
           setShowMiniGame(true)
         } else {
           startNewRound()
@@ -244,9 +246,10 @@ export default function Module3({ profile = null, savedProgress = null, onProgre
   }
 
   // ---- Mini-game ----
-  if (showMiniGame) {
+  if (showMiniGame && MiniGameComponent) {
+    const GameComp = MiniGameComponent
     return (
-      <ButterflyGame
+      <GameComp
         onFinish={() => { setShowMiniGame(false); startNewRound() }}
         onBack={onBack}
       />
