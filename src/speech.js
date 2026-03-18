@@ -68,6 +68,17 @@ async function loadBlob(path) {
   return url
 }
 
+// Probeer studio bestand in meerdere formaten (webm, wav)
+async function loadStudio(id) {
+  const cacheKey = `studio:${id}`
+  if (blobCache[cacheKey]) return blobCache[cacheKey]
+  for (const ext of ['webm', 'wav']) {
+    const url = await loadBlob(`/audio/studio/${id}.${ext}`)
+    if (url) { blobCache[cacheKey] = url; return url }
+  }
+  return null
+}
+
 function playBlob(id, blobUrl, onEnd) {
   if (!audioCache[id]) audioCache[id] = new Audio()
   const audio = audioCache[id]
@@ -89,7 +100,7 @@ export function speakItem(id, text, { onEnd, ttsRate = 0.85 } = {}) {
 
   audioUnlocked.then(() => {
     if (gen !== generation) return
-    return loadBlob(`/audio/studio/${id}.webm`).then(url => {
+    return loadStudio(id).then(url => {
       if (gen !== generation) return
       if (!url) throw new Error('no file')
       return playBlob(id, url, onEnd)
@@ -111,7 +122,7 @@ export function speakWord(word, onEnd) {
 
   audioUnlocked.then(() => {
     if (gen !== generation) return
-    return loadBlob(`/audio/studio/${id}.webm`).then(url => {
+    return loadStudio(id).then(url => {
       if (gen !== generation) return
       if (!url) throw new Error('no studio')
       return playBlob(id, url, onEnd)
@@ -141,7 +152,7 @@ export function speakLetter(letter, onEnd) {
 
   audioUnlocked.then(() => {
     if (gen !== generation) return
-    return loadBlob(`/audio/studio/${id}.webm`).then(url => {
+    return loadStudio(id).then(url => {
       if (gen !== generation) return
       if (!url) throw new Error('no file')
       return playBlob(id, url, onEnd)
