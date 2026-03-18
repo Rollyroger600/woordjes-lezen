@@ -251,9 +251,9 @@
 <div class="filters" id="filters"></div>
 
 <div class="main">
-  <div class="shortcut-hint">
-    💡 <strong>Tip:</strong> Klik op <strong>🎙️ Opnemen</strong> → spreek in → klik <strong>⏹ Stop</strong> → klik <strong>▶ Terugluisteren</strong> om te controleren → klik <strong>✓ Opslaan</strong>.
-    De TTS-knop laat horen hoe de computer-stem het uitspreekt.
+  <div class="shortcut-hint" style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+    <span>💡 <strong>Tip:</strong> Klik op <strong>🎙️ Opnemen</strong> → spreek in → klik <strong>⏹ Stop</strong> → klik <strong>▶ Terugluisteren</strong> om te controleren → klik <strong>✓ Opslaan</strong>.</span>
+    <button class="btn btn-approve" id="retrim-all-btn" onclick="retrimAll()" style="white-space:nowrap;">✂️ Alles hertrimmen</button>
   </div>
   <div id="content" class="loading">Even laden...</div>
 </div>
@@ -767,6 +767,45 @@ function render() {
 function setFilter(cat) {
   activeFilter = cat
   render()
+}
+
+// ---- Retrim all ----
+async function retrimAll() {
+  const recorded = manifest.filter(i => i.recorded)
+  if (recorded.length === 0) { showToast('Geen opnames om te trimmen', 'error'); return }
+  if (!confirm(`${recorded.length} opnames hertrimmen? Dit vervangt de bestaande bestanden.`)) return
+
+  const btn = document.getElementById('retrim-all-btn')
+  btn.disabled = true
+  btn.textContent = '⏳ Bezig...'
+
+  let done = 0, failed = 0
+  for (const item of recorded) {
+    try {
+      btn.textContent = `⏳ ${done + 1}/${recorded.length} — ${item.id}`
+
+      // Fetch bestaand bestand
+      const ext = item.ext || 'webm'
+      const res = await fetch(`/audio/studio/${item.id}.${ext}?t=${Date.now()}`)
+      if (!res.ok) { failed++; continue }
+      const blob = await res.blob()
+
+      // Trim
+      const trimmed = await trimAudio(blob)
+
+      // Sla op via API
+      await saveRecording(item.id, trimmed)
+      done++
+    } catch (e) {
+      console.warn(`Retrim mislukt voor ${item.id}:`, e)
+      failed++
+    }
+  }
+
+  btn.disabled = false
+  btn.textContent = '✂️ Alles hertrimmen'
+  await loadManifest()
+  showToast(`✂️ Klaar! ${done} getrimd${failed ? `, ${failed} mislukt` : ''}`, 'success')
 }
 
 // ---- Init ----
