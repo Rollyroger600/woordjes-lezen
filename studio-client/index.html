@@ -315,8 +315,9 @@ async function loadManifest() {
 }
 
 async function saveRecording(id, blob) {
+  const ext = blob.type.includes('wav') ? 'wav' : 'webm'
   const form = new FormData()
-  form.append('audio', blob, `${id}.webm`)
+  form.append('audio', blob, `${id}.${ext}`)
   try {
     const res = await fetch(`/api/save/${id}`, { method: 'POST', body: form })
     if (res.ok) {
@@ -512,10 +513,15 @@ async function startRecording(id) {
     mediaRecorder.onstop = async () => {
       activeStream = null
       const rawBlob = new Blob(audioChunks, { type: mimeType })
-      showToast('Trimmen...', '')
+      const rawSize = Math.round(rawBlob.size / 1024)
+      showToast('✂️ Trimmen...', '')
       pendingBlob = await trimAudio(rawBlob)
       pendingId = id
-      showToast('Opname getrimd ✂️', 'success')
+      const newSize = Math.round(pendingBlob.size / 1024)
+      const trimmed = pendingBlob !== rawBlob
+      showToast(trimmed
+        ? `✂️ Getrimd! ${rawSize}KB → ${newSize}KB`
+        : '⚠️ Trim overgeslagen (te kort)', trimmed ? 'success' : '')
       render()
     }
     mediaRecorder.start()
