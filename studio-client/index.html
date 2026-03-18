@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>🎙️ Voice Studio — Woordjes Lezen</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f0f2f5;
+      color: #1a1a2e;
+      min-height: 100vh;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+      padding: 20px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+    }
+    .header h1 { font-size: 1.4rem; font-weight: 700; }
+    .header .subtitle { font-size: 0.85rem; opacity: 0.8; margin-top: 2px; }
+
+    .stats-bar { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+    .stat {
+      background: rgba(255,255,255,0.2);
+      border-radius: 20px;
+      padding: 6px 14px;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+    .stat.done { background: rgba(72, 199, 142, 0.4); }
+    .stat.todo { background: rgba(255, 100, 100, 0.4); }
+
+    .progress-bar-wrap {
+      width: 100%;
+      height: 6px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 3px;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      background: #48c78e;
+      border-radius: 3px;
+      transition: width 0.5s ease;
+    }
+
+    .filters {
+      background: white;
+      padding: 12px 24px;
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      border-bottom: 1px solid #e5e7eb;
+      position: sticky;
+      top: 78px;
+      z-index: 99;
+    }
+    .filter-btn {
+      padding: 6px 14px;
+      border-radius: 20px;
+      border: 2px solid #e5e7eb;
+      background: white;
+      cursor: pointer;
+      font-size: 0.82rem;
+      font-weight: 600;
+      white-space: nowrap;
+      transition: all 0.15s;
+      color: #555;
+    }
+    .filter-btn:hover { border-color: #764ba2; color: #764ba2; }
+    .filter-btn.active { background: #764ba2; border-color: #764ba2; color: white; }
+    .filter-btn .badge {
+      display: inline-block;
+      background: #ff4d4d;
+      color: white;
+      border-radius: 10px;
+      padding: 1px 6px;
+      font-size: 0.72rem;
+      margin-left: 4px;
+    }
+    .filter-btn.active .badge { background: rgba(255,255,255,0.4); }
+    .filter-btn .badge.zero { background: #48c78e; }
+
+    .main { padding: 24px; max-width: 900px; margin: 0 auto; }
+
+    .category-section { margin-bottom: 32px; }
+    .category-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #555;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .category-count {
+      font-size: 0.78rem;
+      background: #e5e7eb;
+      border-radius: 10px;
+      padding: 2px 8px;
+      font-weight: 600;
+      color: #666;
+    }
+    .category-count.all-done { background: #d1fae5; color: #059669; }
+
+    .item {
+      background: white;
+      border-radius: 16px;
+      padding: 16px 20px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+      border-left: 4px solid #e5e7eb;
+      transition: box-shadow 0.15s;
+    }
+    .item:hover { box-shadow: 0 3px 12px rgba(0,0,0,0.1); }
+    .item.recorded { border-left-color: #48c78e; }
+    .item.recording { border-left-color: #ff4d4d; background: #fff5f5; }
+
+    .item-info { flex: 1; min-width: 0; }
+    .item-text { font-size: 1.1rem; font-weight: 600; color: #1a1a2e; margin-bottom: 3px; }
+    .item-meta { font-size: 0.78rem; color: #888; }
+
+    .status-badge {
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .status-badge.done { background: #d1fae5; color: #059669; }
+    .status-badge.todo { background: #fee2e2; color: #dc2626; }
+    .status-badge.pending-check { background: #fef3c7; color: #d97706; }
+    .status-badge.recording-now { background: #fee2e2; color: #dc2626; animation: pulse-badge 1s infinite; }
+    @keyframes pulse-badge { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+    .btn-group { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
+
+    .btn {
+      border: none;
+      border-radius: 10px;
+      padding: 8px 14px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn:hover { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+    .btn:active { transform: translateY(0); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+    .btn-record  { background: #ff4d4d; color: white; }
+    .btn-record:hover  { background: #e03e3e; }
+    .btn-stop    { background: #6b7280; color: white; }
+    .btn-play    { background: #3b82f6; color: white; }
+    .btn-play:hover    { background: #2563eb; }
+    .btn-approve { background: #059669; color: white; }
+    .btn-approve:hover { background: #047857; }
+    .btn-tts     { background: #f3f4f6; color: #4b5563; border: 1px solid #e5e7eb; }
+    .btn-tts:hover     { background: #e9ecef; }
+    .btn-delete  { background: #fee2e2; color: #dc2626; font-size: 0.75rem; padding: 6px 10px; }
+    .btn-delete:hover  { background: #fecaca; }
+
+    .waveform { display: none; align-items: center; gap: 3px; height: 24px; }
+    .waveform.active { display: flex; }
+    .waveform span {
+      display: inline-block;
+      width: 3px;
+      background: #ff4d4d;
+      border-radius: 2px;
+      animation: wave 0.8s ease-in-out infinite;
+    }
+    .waveform span:nth-child(2) { animation-delay: 0.1s; }
+    .waveform span:nth-child(3) { animation-delay: 0.2s; }
+    .waveform span:nth-child(4) { animation-delay: 0.3s; }
+    .waveform span:nth-child(5) { animation-delay: 0.4s; }
+    @keyframes wave { 0%,100% { height: 6px; } 50% { height: 20px; } }
+
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: #1f2937;
+      color: white;
+      padding: 12px 24px;
+      border-radius: 12px;
+      font-weight: 600;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+      transition: transform 0.3s ease;
+      z-index: 1000;
+      pointer-events: none;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+    .toast.success { background: #059669; }
+    .toast.error { background: #dc2626; }
+
+    .loading { text-align: center; padding: 60px; color: #888; font-size: 1.1rem; }
+
+    .shortcut-hint {
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      border-radius: 10px;
+      padding: 10px 16px;
+      font-size: 0.82rem;
+      color: #92400e;
+      margin-bottom: 20px;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>🎙️ Voice Studio</h1>
+    <div class="subtitle">Woordjes Lezen — inspreken van teksten</div>
+  </div>
+  <div>
+    <div class="stats-bar" id="stats-bar">
+      <div class="stat">Laden...</div>
+    </div>
+    <div class="progress-bar-wrap">
+      <div class="progress-bar-fill" id="progress-fill" style="width:0%"></div>
+    </div>
+  </div>
+</div>
+
+<div class="filters" id="filters"></div>
+
+<div class="main">
+  <div class="shortcut-hint">
+    💡 <strong>Tip:</strong> Klik op <strong>🎙️ Opnemen</strong> → spreek in → klik <strong>⏹ Stop</strong> → klik <strong>▶ Terugluisteren</strong> om te controleren → klik <strong>✓ Opslaan</strong>.
+    De TTS-knop laat horen hoe de computer-stem het uitspreekt.
+  </div>
+  <div id="content" class="loading">Even laden...</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ---- State ----
+let manifest = []
+let activeFilter = 'Alles'
+let mediaRecorder = null
+let activeStream = null
+let recordingId = null
+let audioChunks = []
+let pendingBlob = null
+let pendingId = null
+let mimeType = ''
+
+// Detect best supported MIME type for this browser
+function detectMimeType() {
+  if (typeof MediaRecorder === 'undefined') return ''
+  const candidates = [
+    'audio/webm;codecs=opus',
+    'audio/webm',
+    'audio/ogg;codecs=opus',
+    'audio/mp4',
+  ]
+  return candidates.find(t => MediaRecorder.isTypeSupported(t)) || ''
+}
+
+// ---- Event delegation — all clicks go through here ----
+document.addEventListener('click', e => {
+  const btn = e.target.closest('[data-action]')
+  if (!btn) return
+  const action = btn.dataset.action
+  const id = btn.dataset.id
+
+  if (action === 'tts')          previewTTS(btn.dataset.text)
+  else if (action === 'play')    playRecorded(id)
+  else if (action === 'play-pending') playBlob(id)
+  else if (action === 'record')  startRecording(id)
+  else if (action === 'stop')    stopRecording()
+  else if (action === 'approve') approveRecording(id)
+  else if (action === 'discard') discardRecording()
+  else if (action === 'delete')  deleteRecording(id)
+  else if (action === 'filter')  setFilter(btn.dataset.cat)
+})
+
+// ---- API ----
+async function loadManifest() {
+  try {
+    const res = await fetch('/api/manifest')
+    manifest = await res.json()
+    render()
+  } catch (e) {
+    document.getElementById('content').innerHTML =
+      '<div class="loading">⚠️ Kan server niet bereiken. Is <code>npm run studio</code> gestart?</div>'
+  }
+}
+
+async function saveRecording(id, blob) {
+  const form = new FormData()
+  form.append('audio', blob, `${id}.webm`)
+  try {
+    const res = await fetch(`/api/save/${id}`, { method: 'POST', body: form })
+    if (res.ok) {
+      await loadManifest()
+      showToast('✓ Opgeslagen!', 'success')
+    } else {
+      const err = await res.json().catch(() => ({}))
+      showToast('Fout bij opslaan: ' + (err.error || res.status), 'error')
+    }
+  } catch (e) {
+    showToast('Netwerkfout bij opslaan', 'error')
+  }
+}
+
+async function deleteRecording(id) {
+  if (!confirm('Opname verwijderen?')) return
+  await fetch(`/api/save/${id}`, { method: 'DELETE' })
+  await loadManifest()
+  showToast('Opname verwijderd')
+}
+
+// ---- Recording ----
+async function startRecording(id) {
+  if (recordingId) stopRecording()
+
+  mimeType = detectMimeType()
+  if (!mimeType) {
+    showToast('Browser ondersteunt geen opnames', 'error')
+    return
+  }
+
+  let stream
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+  } catch (e) {
+    showToast('Geen toegang tot microfoon', 'error')
+    return
+  }
+
+  try {
+    audioChunks = []
+    activeStream = stream
+    mediaRecorder = new MediaRecorder(stream, { mimeType })
+    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data) }
+    mediaRecorder.onstop = () => {
+      activeStream = null
+      pendingBlob = new Blob(audioChunks, { type: mimeType })
+      pendingId = id
+      render()
+    }
+    mediaRecorder.start()
+    recordingId = id
+    render()
+  } catch (e) {
+    stream.getTracks().forEach(t => t.stop())
+    activeStream = null
+    showToast('Kon opname niet starten: ' + e.message, 'error')
+  }
+}
+
+function stopRecording() {
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    mediaRecorder.stop()
+  }
+  if (activeStream) {
+    activeStream.getTracks().forEach(t => t.stop())
+    activeStream = null
+  }
+  recordingId = null
+  // render() will be called by mediaRecorder.onstop
+}
+
+function playBlob(id) {
+  if (pendingId !== id || !pendingBlob) { showToast('Geen opname beschikbaar', 'error'); return }
+  const url = URL.createObjectURL(pendingBlob)
+  const audio = new Audio(url)
+  audio.onended = () => URL.revokeObjectURL(url)
+  audio.play().catch(e => {
+    URL.revokeObjectURL(url)
+    showToast('Kan opname niet afspelen', 'error')
+  })
+}
+
+async function approveRecording(id) {
+  if (pendingId !== id || !pendingBlob) { showToast('Geen opname om op te slaan', 'error'); return }
+  const blob = pendingBlob
+  pendingBlob = null
+  pendingId = null
+  await saveRecording(id, blob)
+}
+
+function discardRecording() {
+  pendingBlob = null
+  pendingId = null
+  render()
+}
+
+// ---- Playback of saved files ----
+// Fetch as blob first so MIME type is handled correctly regardless of server headers
+async function playRecorded(id) {
+  try {
+    const res = await fetch(`/audio/studio/${id}.webm?t=${Date.now()}`)
+    if (!res.ok) { showToast('Opname niet gevonden op server', 'error'); return }
+    const blob = await res.blob()
+    if (blob.size === 0) { showToast('Opname is leeg', 'error'); return }
+    const url = URL.createObjectURL(blob)
+    const audio = new Audio(url)
+    audio.onended = () => URL.revokeObjectURL(url)
+    await audio.play()
+  } catch (e) {
+    showToast('Kan opname niet afspelen', 'error')
+  }
+}
+
+// ---- TTS Preview ----
+function previewTTS(text) {
+  window.speechSynthesis.cancel()
+  const utter = new SpeechSynthesisUtterance(text)
+  utter.lang = 'nl-NL'
+  utter.rate = 0.85
+  utter.pitch = 1.1
+  const voices = window.speechSynthesis.getVoices()
+  const nl = voices.find(v => v.lang.startsWith('nl'))
+  if (nl) utter.voice = nl
+  window.speechSynthesis.speak(utter)
+}
+
+// ---- Toast ----
+function showToast(msg, type = '') {
+  const toast = document.getElementById('toast')
+  toast.textContent = msg
+  toast.className = `toast show ${type}`
+  setTimeout(() => { toast.className = `toast ${type}` }, 2500)
+}
+
+// ---- Render helpers ----
+function escapeAttr(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+}
+
+function formatDate(iso) {
+  if (!iso) return ''
+  return new Date(iso).toLocaleDateString('nl-NL', {
+    day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
+  })
+}
+
+function getCategories() {
+  const cats = {}
+  manifest.forEach(item => {
+    if (!cats[item.category]) cats[item.category] = { total: 0, recorded: 0 }
+    cats[item.category].total++
+    if (item.recorded) cats[item.category].recorded++
+  })
+  return cats
+}
+
+// ---- Render ----
+function renderStats() {
+  const total = manifest.length
+  const recorded = manifest.filter(i => i.recorded).length
+  const todo = total - recorded
+  const pct = total > 0 ? Math.round((recorded / total) * 100) : 0
+
+  document.getElementById('stats-bar').innerHTML = `
+    <div class="stat">${total} teksten</div>
+    <div class="stat done">✓ ${recorded} ingesproken</div>
+    ${todo > 0
+      ? `<div class="stat todo">⚠ ${todo} nog te doen</div>`
+      : '<div class="stat done">🎉 Alles klaar!</div>'}
+    <div class="stat">${pct}%</div>
+  `
+  document.getElementById('progress-fill').style.width = `${pct}%`
+}
+
+function renderFilters() {
+  const cats = getCategories()
+  const total = manifest.length
+  const totalRecorded = manifest.filter(i => i.recorded).length
+  const allTodo = total - totalRecorded
+
+  const allCategories = ['Alles', ...Object.keys(cats)]
+  document.getElementById('filters').innerHTML = allCategories.map(cat => {
+    const isAll = cat === 'Alles'
+    const todo = isAll ? allTodo : (cats[cat].total - cats[cat].recorded)
+    const badge = todo > 0
+      ? `<span class="badge">${todo}</span>`
+      : `<span class="badge zero">✓</span>`
+    const isActive = activeFilter === cat
+    return `<button class="filter-btn ${isActive ? 'active' : ''}" data-action="filter" data-cat="${escapeAttr(cat)}">${escapeAttr(cat)}${badge}</button>`
+  }).join('')
+}
+
+function renderItem(item) {
+  const isRecording = recordingId === item.id
+  const isPending = pendingId === item.id
+
+  let statusBadge, buttons, cardClass = 'item'
+
+  if (isRecording) {
+    cardClass += ' recording'
+    statusBadge = `<span class="status-badge recording-now">● Opnemen...</span>`
+    buttons = `<button class="btn btn-stop" data-action="stop">⏹ Stop</button>`
+  } else if (isPending) {
+    statusBadge = `<span class="status-badge pending-check">◉ Controleer opname</span>`
+    buttons = `
+      <button class="btn btn-play" data-action="play-pending" data-id="${escapeAttr(item.id)}">▶ Terugluisteren</button>
+      <button class="btn btn-approve" data-action="approve" data-id="${escapeAttr(item.id)}">✓ Opslaan</button>
+      <button class="btn btn-delete" data-action="discard">✗ Opnieuw</button>
+    `
+  } else if (item.recorded) {
+    cardClass += ' recorded'
+    statusBadge = `<span class="status-badge done">✓ Ingesproken</span>`
+    buttons = `
+      <button class="btn btn-tts" data-action="tts" data-text="${escapeAttr(item.text)}" title="Hoor de computer-stem">🤖 TTS</button>
+      <button class="btn btn-play" data-action="play" data-id="${escapeAttr(item.id)}">▶ Afspelen</button>
+      <button class="btn btn-record" data-action="record" data-id="${escapeAttr(item.id)}">🎙️ Opnieuw</button>
+      <button class="btn btn-delete" data-action="delete" data-id="${escapeAttr(item.id)}">🗑</button>
+    `
+  } else {
+    statusBadge = `<span class="status-badge todo">○ Nog te doen</span>`
+    buttons = `
+      <button class="btn btn-tts" data-action="tts" data-text="${escapeAttr(item.text)}" title="Hoor de computer-stem">🤖 TTS</button>
+      <button class="btn btn-record" data-action="record" data-id="${escapeAttr(item.id)}">🎙️ Opnemen</button>
+    `
+  }
+
+  const meta = item.recorded
+    ? `${escapeAttr(item.usedIn)} &bull; ${formatDate(item.recordedAt)}`
+    : escapeAttr(item.usedIn)
+
+  return `
+    <div class="${cardClass}" data-id="${escapeAttr(item.id)}">
+      <div class="item-info">
+        <div class="item-text">${escapeAttr(item.text)}</div>
+        <div class="item-meta">${meta}</div>
+      </div>
+      <div class="waveform ${isRecording ? 'active' : ''}">
+        <span></span><span></span><span></span><span></span><span></span>
+      </div>
+      ${statusBadge}
+      <div class="btn-group">${buttons}</div>
+    </div>
+  `
+}
+
+function renderItems() {
+  const filtered = activeFilter === 'Alles'
+    ? manifest
+    : manifest.filter(i => i.category === activeFilter)
+
+  const cats = {}
+  filtered.forEach(item => {
+    if (!cats[item.category]) cats[item.category] = []
+    cats[item.category].push(item)
+  })
+
+  const content = document.getElementById('content')
+  if (filtered.length === 0) {
+    content.innerHTML = '<div class="loading">Geen items gevonden</div>'
+    return
+  }
+
+  content.innerHTML = Object.entries(cats).map(([cat, items]) => {
+    const doneCount = items.filter(i => i.recorded).length
+    const allDone = doneCount === items.length
+    return `
+      <div class="category-section">
+        <div class="category-title">
+          ${escapeAttr(cat)}
+          <span class="category-count ${allDone ? 'all-done' : ''}">${doneCount}/${items.length}</span>
+        </div>
+        ${items.map(item => renderItem(item)).join('')}
+      </div>
+    `
+  }).join('')
+}
+
+function render() {
+  renderStats()
+  renderFilters()
+  renderItems()
+}
+
+function setFilter(cat) {
+  activeFilter = cat
+  render()
+}
+
+// ---- Init ----
+window.speechSynthesis.getVoices()
+window.speechSynthesis.addEventListener('voiceschanged', () => {})
+loadManifest()
+
+// Refresh every 30s to pick up external changes
+setInterval(loadManifest, 30000)
+</script>
+</body>
+</html>

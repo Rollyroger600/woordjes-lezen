@@ -1,0 +1,118 @@
+// ============================================================
+// speech.js — universele spreekfunctie
+// Probeert altijd eerst een ingesproken opname uit public/audio/studio/
+// Als die er niet is, valt hij terug op browser TTS (nl-NL)
+// Gebruikt blob-URL's om MIME-type problemen met .webm te voorkomen
+// ============================================================
+
+const blobCache = {}   // id → blob URL (eenmalig gefetcht)
+const audioCache = {}  // id → Audio element (hergebruikt)
+let generation = 0     // voorkomt dat stale fetches nog afspelen
+
+function stopAll() {
+  generation++
+  window.speechSynthesis.cancel()
+  Object.values(audioCache).forEach(a => {
+    try { a.pause(); a.currentTime = 0 } catch (_) {}
+  })
+}
+
+function tts(text, { onEnd, rate = 0.85 } = {}) {
+  const utter = new SpeechSynthesisUtterance(text)
+  utter.lang = 'nl-NL'
+  utter.rate = rate
+  utter.pitch = 1.1
+  const voices = window.speechSynthesis.getVoices()
+  const nlVoice = voices.find(v => v.lang.startsWith('nl'))
+  if (nlVoice) utter.voice = nlVoice
+  if (onEnd) utter.onend = onEnd
+  window.speechSynthesis.speak(utter)
+}
+
+// Fetch audio als blob en cache de object-URL
+async function loadBlob(path) {
+  if (blobCache[path]) return blobCache[path]
+  const res = await fetch(path)
+  if (!res.ok) return null
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  blobCache[path] = url
+  return url
+}
+
+function playBlob(id, blobUrl, onEnd) {
+  if (!audioCache[id]) audioCache[id] = new Audio()
+  const audio = audioCache[id]
+  audio.src = blobUrl
+  audio.currentTime = 0
+  audio.onended = onEnd || null
+  return audio.play()
+}
+
+/**
+ * Spreek een item uit de speech manifest.
+ * @param {string} id       - Manifest ID (bijv. 'instr-module1-start')
+ * @param {string} text     - Fallback tekst voor TTS
+ * @param {object} options  - { onEnd, ttsRate }
+ */
+export function speakItem(id, text, { onEnd, ttsRate = 0.85 } = {}) {
+  stopAll()
+  const gen = generation
+
+  loadBlob(`/audio/studio/${id}.webm`).then(url => {
+    if (gen !== generation) return
+    if (!url) throw new Error('no file')
+    return playBlob(id, url, onEnd)
+  }).catch(() => {
+    if (gen !== generation) return
+    tts(text, { onEnd, rate: ttsRate })
+  })
+}
+
+/**
+ * Spreek een Module 1 woord uit.
+ * Volgorde: studio opname → legacy .m4a → TTS
+ */
+export function speakWord(word, onEnd) {
+  stopAll()
+  const gen = generation
+  const id = `woord-${word}`
+
+  loadBlob(`/audio/studio/${id}.webm`).then(url => {
+    if (gen !== generation) return
+    if (!url) throw new Error('no studio')
+    return playBlob(id, url, onEnd)
+  }).catch(() => {
+    if (gen !== generation) return
+    const legacyPath = `/audio/${word.charAt(0).toUpperCase() + word.slice(1)}.m4a`
+    return loadBlob(legacyPath).then(url => {
+      if (gen !== generation) return
+      if (!url) throw new Error('no legacy')
+      return playBlob(`legacy-${word}`, url, onEnd)
+    })
+  }).catch(() => {
+    if (gen !== generation) return
+    tts(word, { onEnd })
+  })
+}
+
+/**
+ * Spreek een losse letter/klank uit (Module 2).
+ * Studio opname → TTS met langzamere rate (0.7)
+ */
+export function speakLetter(letter, onEnd) {
+  stopAll()
+  const gen = generation
+  const id = `letter-${letter}`
+
+  loadBlob(`/audio/studio/${id}.webm`).then(url => {
+    if (gen !== generation) return
+    if (!url) throw new Error('no file')
+    return playBlob(id, url, onEnd)
+  }).catch(() => {
+    if (gen !== generation) return
+    tts(letter, { onEnd, rate: 0.7 })
+  })
+}
+
+export { stopAll }

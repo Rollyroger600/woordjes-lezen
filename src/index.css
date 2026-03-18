@@ -97,3 +97,25 @@ body {
 .animate-pulse-gentle {
   animation: pulse-gentle 2s ease-in-out infinite;
 }
+
+/* Butterfly fly animation for mini-game */
+@keyframes butterfly-fly {
+  0% { left: -12%; }
+  100% { left: 112%; }
+}
+
+@keyframes butterfly-fly-reverse {
+  0% { right: -12%; }
+  100% { right: 112%; }
+}
+
+/* Streak flame pulse */
+@keyframes flame-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+}
+
+.animate-flame {
+  display: inline-block;
+  animation: flame-pulse 0.8s ease-in-out infinite;
+}

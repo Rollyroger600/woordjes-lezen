@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import confetti from 'canvas-confetti'
+import ButterflyGame from './ButterflyGame'
+import { speakItem, speakWord, stopAll } from './speech'
 
 const LEVELS = [
   ['de', 'het', 'een'],
@@ -37,39 +39,8 @@ function pickWords(level, count, mustInclude) {
   return shuffleArray([...picked])
 }
 
-// Audio cache to avoid creating new Audio objects each time
-const audioCache = {}
 
-function speak(text, onEnd) {
-  // Capitalize first letter to match filenames (De.m4a, Het.m4a, etc.)
-  const filename = text.charAt(0).toUpperCase() + text.slice(1)
-  const audioSrc = `/audio/${filename}.m4a`
-
-  // Stop any currently playing audio
-  Object.values(audioCache).forEach(a => { a.pause(); a.currentTime = 0 })
-
-  if (!audioCache[text]) {
-    audioCache[text] = new Audio(audioSrc)
-  }
-  const audio = audioCache[text]
-  audio.currentTime = 0
-  if (onEnd) audio.onended = onEnd
-  audio.play().catch(() => {
-    // Fallback to Web Speech API if audio file fails
-    window.speechSynthesis.cancel()
-    const utter = new SpeechSynthesisUtterance(text)
-    utter.lang = 'nl-NL'
-    utter.rate = 0.8
-    utter.pitch = 1.1
-    const voices = window.speechSynthesis.getVoices()
-    const nlVoice = voices.find(v => v.lang.startsWith('nl'))
-    if (nlVoice) utter.voice = nlVoice
-    if (onEnd) utter.onend = onEnd
-    window.speechSynthesis.speak(utter)
-  })
-}
-
-function App() {
+function App({ profile = null, savedProgress = null, onProgressUpdate = null, onBack = null }) {
   const [gameStarted, setGameStarted] = useState(false)
   const [level, setLevel] = useState(0)
   const [visibleCount, setVisibleCount] = useState(2)
@@ -85,6 +56,21 @@ function App() {
   const [newStar, setNewStar] = useState(false)
   const [transitioning, setTransitioning] = useState(false)
   const [allDone, setAllDone] = useState(false)
+
+  // Blok van 10 vragen
+  const [roundCount, setRoundCount] = useState(0)
+  const [showMiniGame, setShowMiniGame] = useState(false)
+  const nextRoundAfterGameRef = useRef(null)
+
+  // Opwarmer state
+  const [warmupMode, setWarmupMode] = useState(false)
+  const [warmupCorrectStreak, setWarmupCorrectStreak] = useState(0)
+  const [warmupCorrectTotal, setWarmupCorrectTotal] = useState(0)
+  const [warmupDone, setWarmupDone] = useState(false)
+  const warmupLevelRef = useRef(0)
+  const warmupCountRef = useRef(2)
+  const savedLevelRef = useRef(0)
+  const savedCountRef = useRef(2)
 
   const hintTimerRef = useRef(null)
   const hint2TimerRef = useRef(null)
@@ -104,7 +90,7 @@ function App() {
       setHintLevel(1)
       hint2TimerRef.current = setTimeout(() => {
         setHintLevel(2)
-        speak(word)
+        speakWord(word)
       }, 5000)
     }, 5000)
   }, [clearHintTimers])
@@ -120,7 +106,7 @@ function App() {
     setPopWord(null)
     // Speak after a brief delay so the UI updates first
     setTimeout(() => {
-      speak(target)
+      speakWord(target)
       startHintTimers(target)
     }, 300)
   }, [startHintTimers])
@@ -138,7 +124,6 @@ function App() {
 
   const handleStart = () => {
     // iOS Safari requires user interaction to unlock audio context
-    // Create and play a tiny silent buffer — no audible sound
     try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)()
       const buffer = ctx.createBuffer(1, 1, 22050)
@@ -148,16 +133,49 @@ function App() {
       source.start(0)
     } catch (e) { /* ignore */ }
 
+    // Laad voortgang uit savedProgress als beschikbaar
+    const startLevel = savedProgress?.current_level ?? 0
+    const startCount = savedProgress?.words_visible ?? 2
+    const startStars = savedProgress?.total_stars ?? 0
+    const startStreak = savedProgress?.consecutive_correct ?? 0
+    const startErrorStreak = savedProgress?.consecutive_wrong ?? 0
+
     setGameStarted(true)
-    setLevel(0)
-    setVisibleCount(2)
-    setStreak(0)
-    setErrorStreak(0)
-    setStars(0)
+    setLevel(startLevel)
+    setVisibleCount(startCount)
+    setStreak(startStreak)
+    setErrorStreak(startErrorStreak)
+    setStars(startStars)
     setStarProgress(0)
     setAllDone(false)
-    // Start first round after a tick
-    setTimeout(() => startNewRound(0, 2), 400)
+    setRoundCount(0)
+    setShowMiniGame(false)
+
+    // Spreek instructie uit, START pas daarna de eerste ronde
+    let wLevel = startLevel, wCount = startCount
+    if (startStars > 0) {
+      wLevel = Math.max(0, startLevel - 1)
+      wCount = Math.max(2, startCount - 1)
+      warmupLevelRef.current = wLevel
+      warmupCountRef.current = wCount
+      savedLevelRef.current = startLevel
+      savedCountRef.current = startCount
+      setWarmupMode(true)
+      setWarmupCorrectStreak(0)
+      setWarmupCorrectTotal(0)
+      setWarmupDone(false)
+    } else {
+      setWarmupMode(false)
+    }
+
+    const firstRoundLevel = startStars > 0 ? wLevel : startLevel
+    const firstRoundCount = startStars > 0 ? wCount : startCount
+
+    setTimeout(() => {
+      speakItem('instr-module1-start', 'Welk woord hoor je? Tik op het goede woord!', {
+        onEnd: () => setTimeout(() => startNewRound(firstRoundLevel, firstRoundCount), 300),
+      })
+    }, 200)
   }
 
   const resetInteraction = () => {
@@ -167,9 +185,61 @@ function App() {
     startHintTimers(targetWord)
   }
 
+  // Opwarmer antwoord afhandelen
+  const handleWarmupTap = useCallback((word) => {
+    if (word === targetWord) {
+      clearHintTimers()
+      setPopWord(word)
+      setTransitioning(true)
+      confetti({
+        particleCount: 60,
+        spread: 60,
+        origin: { y: 0.6 },
+        colors: ['#FF6B6B', '#4ECDC4', '#FFE66D'],
+      })
+
+      setWarmupCorrectStreak(prev => {
+        const newStreak = prev + 1
+        setWarmupCorrectTotal(total => {
+          const newTotal = total + 1
+          const done = newStreak >= 3 || newTotal >= 5
+          if (done) {
+            setWarmupDone(true)
+            setTimeout(() => {
+              setWarmupMode(false)
+              setWarmupDone(false)
+              setPopWord(null)
+              setTransitioning(false)
+              startNewRound(savedLevelRef.current, savedCountRef.current)
+            }, 1800)
+          } else {
+            setTimeout(() => {
+              setPopWord(null)
+              setTransitioning(false)
+              startNewRound(warmupLevelRef.current, warmupCountRef.current)
+            }, 800)
+          }
+          return newTotal
+        })
+        return newStreak
+      })
+    } else {
+      setShakeWord(word)
+      setWarmupCorrectStreak(0)
+      setTimeout(() => speakWord(targetWord), 500)
+      setTimeout(() => setShakeWord(null), 500)
+    }
+  }, [targetWord, clearHintTimers, startNewRound])
+
   const handleWordTap = (word) => {
     if (transitioning) return
     resetInteraction()
+
+    // Opwarmer modus
+    if (warmupMode) {
+      handleWarmupTap(word)
+      return
+    }
 
     if (word === targetWord) {
       // Correct!
@@ -190,10 +260,18 @@ function App() {
       setStreak(newStreak)
       setErrorStreak(newErrorStreak)
 
+      // Blok van 10 vragen
+      const newRoundCount = roundCount + 1
+      setRoundCount(newRoundCount)
+
       // Star progress
       const newProgress = starProgress + 1
+      let newStars = stars
+      let newStarProgress = newProgress
       if (newProgress >= 10) {
-        setStars(s => s + 1)
+        newStars = stars + 1
+        newStarProgress = 0
+        setStars(newStars)
         setStarProgress(0)
         setNewStar(true)
         setTimeout(() => setNewStar(false), 600)
@@ -224,15 +302,41 @@ function App() {
             spread: 120,
             origin: { y: 0.5 },
           })
+          if (onProgressUpdate) {
+            onProgressUpdate({
+              current_level: nextLevel,
+              words_visible: nextCount,
+              total_stars: newStars,
+              consecutive_correct: 0,
+              consecutive_wrong: 0,
+            })
+          }
           return
         }
         setVisibleCount(nextCount)
       }
 
+      // Voortgang opslaan
+      if (onProgressUpdate) {
+        onProgressUpdate({
+          current_level: nextLevel,
+          words_visible: nextCount,
+          total_stars: newStars,
+          consecutive_correct: newStreak,
+          consecutive_wrong: 0,
+        })
+      }
+
       setTimeout(() => {
         setPopWord(null)
         setTransitioning(false)
-        startNewRound(nextLevel, nextCount)
+        if (newRoundCount > 0 && newRoundCount % 10 === 0) {
+          // Mini-game na 10 vragen
+          nextRoundAfterGameRef.current = { level: nextLevel, count: nextCount }
+          setShowMiniGame(true)
+        } else {
+          startNewRound(nextLevel, nextCount)
+        }
       }, 1000)
 
     } else {
@@ -251,8 +355,19 @@ function App() {
       }
 
       // Repeat the word
-      setTimeout(() => speak(targetWord), 500)
+      setTimeout(() => speakWord(targetWord), 500)
       setTimeout(() => setShakeWord(null), 500)
+
+      // Voortgang opslaan
+      if (onProgressUpdate) {
+        onProgressUpdate({
+          current_level: level,
+          words_visible: nextCount,
+          total_stars: stars,
+          consecutive_correct: 0,
+          consecutive_wrong: newErrorStreak,
+        })
+      }
 
       // If count changed, start new round with fewer words
       if (nextCount !== visibleCount) {
@@ -268,7 +383,7 @@ function App() {
   const handleBackgroundTap = (e) => {
     if (e.target === e.currentTarget && targetWord && !transitioning) {
       resetInteraction()
-      speak(targetWord)
+      speakWord(targetWord)
     }
   }
 
@@ -280,12 +395,19 @@ function App() {
     return ''
   }
 
+  // Start scherm
   if (!gameStarted) {
     return (
       <div className="h-full flex flex-col items-center justify-center p-6 select-none">
-        <div className="text-6xl mb-6">
-          📚
-        </div>
+        {profile && (
+          <div className="flex items-center gap-3 mb-6">
+            <span className="text-5xl">{profile.avatar}</span>
+            <span className="text-white text-2xl font-bold" style={{ fontFamily: 'OpenDyslexic, sans-serif' }}>
+              {profile.child_name}
+            </span>
+          </div>
+        )}
+        {!profile && <div className="text-6xl mb-6">📚</div>}
         <h1 className="text-white text-3xl font-bold mb-4 text-center" style={{ fontFamily: 'OpenDyslexic, sans-serif' }}>
           Woordjes Lezen
         </h1>
@@ -297,18 +419,37 @@ function App() {
           className="animate-pulse-gentle bg-white text-purple-700 font-bold py-6 px-12 rounded-3xl text-2xl shadow-lg active:scale-95 transition-transform"
           style={{ fontFamily: 'OpenDyslexic, sans-serif' }}
         >
-          Start!
+          {savedProgress?.total_stars > 0 ? 'Verder spelen!' : 'Start!'}
         </button>
+        {onBack && (
+          <button onClick={onBack} className="mt-8 text-white/50 text-sm" style={{ fontFamily: 'OpenDyslexic, sans-serif' }}>
+            ← terug
+          </button>
+        )}
       </div>
+    )
+  }
+
+  // Mini-game na 10 vragen
+  if (showMiniGame) {
+    return (
+      <ButterflyGame
+        onFinish={() => {
+          setShowMiniGame(false)
+          const next = nextRoundAfterGameRef.current
+          if (next) {
+            startNewRound(next.level, next.count)
+          }
+        }}
+        onBack={onBack}
+      />
     )
   }
 
   if (allDone) {
     return (
       <div className="h-full flex flex-col items-center justify-center p-6 select-none">
-        <div className="text-6xl mb-4">
-          🎉
-        </div>
+        <div className="text-6xl mb-4">🎉</div>
         <h1 className="text-white text-3xl font-bold mb-4 text-center" style={{ fontFamily: 'OpenDyslexic, sans-serif' }}>
           Super goed!
         </h1>
@@ -327,6 +468,11 @@ function App() {
         >
           Opnieuw!
         </button>
+        {onBack && (
+          <button onClick={onBack} className="mt-6 text-white/50 text-sm" style={{ fontFamily: 'OpenDyslexic, sans-serif' }}>
+            ← terug
+          </button>
+        )}
       </div>
     )
   }
@@ -358,12 +504,28 @@ function App() {
         </div>
       </div>
 
-      {/* Level indicator */}
+      {/* Level indicator / opwarmer banner */}
       <div className="text-center">
-        <span className="text-white/60 text-sm" style={{ fontFamily: 'OpenDyslexic, sans-serif' }}>
-          Level {level + 1}
-        </span>
+        {warmupMode ? (
+          <span className="text-yellow-300 text-sm font-bold" style={{ fontFamily: 'OpenDyslexic, sans-serif' }}>
+            {warmupDone ? 'Je weet het nog! ⭐' : 'Even opwarmen! 🔥'}
+          </span>
+        ) : (
+          <span className="text-white/60 text-sm" style={{ fontFamily: 'OpenDyslexic, sans-serif' }}>
+            Level {level + 1}
+          </span>
+        )}
       </div>
+
+      {/* Home knop */}
+      {onBack && (
+        <button
+          className="absolute top-2 left-3 text-2xl opacity-40 active:opacity-100 transition-opacity"
+          onClick={(e) => { e.stopPropagation(); onBack() }}
+        >
+          🏠
+        </button>
+      )}
 
       {/* Word blocks */}
       <div
