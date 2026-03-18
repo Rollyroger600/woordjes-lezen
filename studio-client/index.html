@@ -338,6 +338,131 @@ async function deleteRecording(id) {
   showToast('Opname verwijderd')
 }
 
+// ---- Audio trimming ----
+// Knipt stilte, ruis en keyboard-kliks weg aan begin en einde
+async function trimAudio(blob) {
+  try {
+    const ctx = new AudioContext()
+    const arrayBuf = await blob.arrayBuffer()
+    const audioBuf = await ctx.decodeAudioData(arrayBuf)
+    const samples = audioBuf.getChannelData(0)
+    const sr = audioBuf.sampleRate
+
+    // RMS over windows van 20ms
+    const winSize = Math.floor(sr * 0.02)
+    const threshold = 0.008
+
+    function rms(start, len) {
+      let sum = 0
+      const end = Math.min(start + len, samples.length)
+      for (let i = start; i < end; i++) sum += samples[i] * samples[i]
+      return Math.sqrt(sum / (end - start))
+    }
+
+    // Vind begin: eerste window boven threshold
+    let trimStart = 0
+    for (let i = 0; i < samples.length - winSize; i += winSize) {
+      if (rms(i, winSize) > threshold) { trimStart = i; break }
+    }
+
+    // Vind einde: scan achteruit, sla korte bursts (<100ms) over (keyboard klik)
+    let trimEnd = samples.length
+    const minBurst = Math.floor(sr * 0.1) // 100ms — korter = waarschijnlijk klik
+
+    // Stap 1: vind laatste sample boven threshold
+    let rawEnd = samples.length - 1
+    for (let i = samples.length - 1; i > trimStart; i -= winSize) {
+      if (rms(Math.max(0, i - winSize), winSize) > threshold) { rawEnd = i; break }
+    }
+
+    // Stap 2: check of dit een korte burst is (klik). Zo ja, spring erover
+    let pos = rawEnd
+    while (pos > trimStart) {
+      // Vind einde van huidige geluidsblok
+      let blockEnd = pos
+      // Scan achteruit om begin van dit blok te vinden
+      let blockStart = pos
+      while (blockStart > trimStart && rms(Math.max(0, blockStart - winSize), winSize) > threshold * 0.5) {
+        blockStart -= winSize
+      }
+      const blockLen = blockEnd - blockStart
+
+      if (blockLen >= minBurst) {
+        // Dit is spraak, niet een klik
+        trimEnd = blockEnd
+        break
+      }
+      // Kort blok (klik) — spring erover en zoek verder terug
+      pos = blockStart
+      // Sla stilte over
+      while (pos > trimStart && rms(Math.max(0, pos - winSize), winSize) <= threshold) {
+        pos -= winSize
+      }
+    }
+
+    if (trimEnd <= trimStart) trimEnd = rawEnd // fallback
+
+    // Padding: 40ms voor, 60ms na
+    trimStart = Math.max(0, trimStart - Math.floor(sr * 0.04))
+    trimEnd = Math.min(samples.length, trimEnd + Math.floor(sr * 0.06))
+    const trimLength = trimEnd - trimStart
+
+    if (trimLength < sr * 0.1) {
+      // Te kort na trim — gebruik origineel
+      ctx.close()
+      return blob
+    }
+
+    // Maak getrimde buffer
+    const trimmedBuf = new AudioBuffer({
+      numberOfChannels: audioBuf.numberOfChannels,
+      length: trimLength,
+      sampleRate: sr
+    })
+    for (let ch = 0; ch < audioBuf.numberOfChannels; ch++) {
+      const orig = audioBuf.getChannelData(ch)
+      trimmedBuf.copyToChannel(orig.subarray(trimStart, trimEnd), ch)
+    }
+
+    // Fade-out: laatste 30ms
+    const fadeLen = Math.floor(sr * 0.03)
+    for (let ch = 0; ch < trimmedBuf.numberOfChannels; ch++) {
+      const data = trimmedBuf.getChannelData(ch)
+      for (let i = 0; i < fadeLen; i++) {
+        data[data.length - 1 - i] *= i / fadeLen
+      }
+    }
+
+    // Encode terug via MediaStreamDestination
+    const dest = ctx.createMediaStreamDestination()
+    const source = ctx.createBufferSource()
+    source.buffer = trimmedBuf
+    source.connect(dest)
+
+    const recorder = new MediaRecorder(dest.stream, { mimeType: mimeType || 'audio/webm' })
+    const chunks = []
+
+    const result = await new Promise((resolve) => {
+      recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data) }
+      recorder.onstop = () => resolve(new Blob(chunks, { type: recorder.mimeType }))
+      source.onended = () => setTimeout(() => recorder.stop(), 50)
+      recorder.start()
+      source.start(0)
+    })
+
+    ctx.close()
+
+    const savedMs = Math.round((audioBuf.duration - trimmedBuf.duration) * 1000)
+    if (savedMs > 50) {
+      console.log(`✂️ Trim: ${Math.round(audioBuf.duration * 1000)}ms → ${Math.round(trimmedBuf.duration * 1000)}ms (${savedMs}ms weggeknipt)`)
+    }
+    return result
+  } catch (e) {
+    console.warn('Trim mislukt, gebruik origineel:', e)
+    return blob
+  }
+}
+
 // ---- Recording ----
 async function startRecording(id) {
   if (recordingId) stopRecording()
@@ -361,10 +486,13 @@ async function startRecording(id) {
     activeStream = stream
     mediaRecorder = new MediaRecorder(stream, { mimeType })
     mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data) }
-    mediaRecorder.onstop = () => {
+    mediaRecorder.onstop = async () => {
       activeStream = null
-      pendingBlob = new Blob(audioChunks, { type: mimeType })
+      const rawBlob = new Blob(audioChunks, { type: mimeType })
+      showToast('Trimmen...', '')
+      pendingBlob = await trimAudio(rawBlob)
       pendingId = id
+      showToast('Opname getrimd ✂️', 'success')
       render()
     }
     mediaRecorder.start()
@@ -386,7 +514,7 @@ function stopRecording() {
     activeStream = null
   }
   recordingId = null
-  // render() will be called by mediaRecorder.onstop
+  // render() will be called by mediaRecorder.onstop (after trimming)
 }
 
 function playBlob(id) {
