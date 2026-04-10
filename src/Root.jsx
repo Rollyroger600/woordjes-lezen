@@ -1,17 +1,25 @@
 import { useState } from 'react'
 import { supabase } from './supabase'
+import { debugLog } from './debugLogger'
 import ProfileScreen from './ProfileScreen'
-import ModuleSelect from './ModuleSelect'
+import HomeScreen from './HomeScreen'
+import WorldSubSelect from './WorldSubSelect'
+import SamiIntro from './SamiIntro'
 import App from './App'
 import Module2 from './Module2'
 import Module3 from './Module3'
+import PatroonGame from './PatroonGame'
+import SimonGame from './SimonGame'
+import KlokGame from './KlokGame'
+import RekenGame from './RekenGame'
 
 const font = { fontFamily: 'OpenDyslexic, sans-serif' }
 
 export default function Root() {
-  const [screen, setScreen] = useState('splash')
-  const [profile, setProfile] = useState(null)
+  const [screen, setScreen]           = useState('splash')
+  const [profile, setProfile]         = useState(null)
   const [progressMap, setProgressMap] = useState({})
+  const [activeWorld, setActiveWorld] = useState(null) // world card id voor sub-select
 
   const handleProfileSelect = async (prof) => {
     // Streak tracking
@@ -24,7 +32,7 @@ export default function Root() {
       newStreak = 1
       shouldUpdate = true
     } else if (lastPlayed === today) {
-      // Already played today — no change
+      // Al vandaag gespeeld — geen wijziging
     } else {
       const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0]
       if (lastPlayed === yesterday) {
@@ -45,7 +53,7 @@ export default function Root() {
     const updatedProfile = { ...prof, streak_count: newStreak, last_played_date: today }
     setProfile(updatedProfile)
 
-    // Load progress for all modules
+    // Laad voortgang voor alle modules
     const { data } = await supabase
       .from('progress')
       .select('*')
@@ -53,7 +61,26 @@ export default function Root() {
     const map = {}
     if (data) data.forEach(p => { map[p.module] = p })
     setProgressMap(map)
-    setScreen('modules')
+
+    // Sami intro eenmalig tonen
+    if (!prof.sami_introduced) {
+      debugLog('Scherm', 'sami-intro (eerste keer)')
+      setScreen('sami-intro')
+    } else {
+      debugLog('Scherm', 'home')
+      setScreen('home')
+    }
+  }
+
+  const handleSamiIntroDone = async () => {
+    // Sla op dat intro gezien is
+    await supabase
+      .from('profiles')
+      .update({ sami_introduced: true })
+      .eq('id', profile.id)
+    setProfile(prev => ({ ...prev, sami_introduced: true }))
+    debugLog('Sami intro', 'voltooid → home')
+    setScreen('home')
   }
 
   const handleProgressUpdate = async (module, updates) => {
@@ -66,10 +93,37 @@ export default function Root() {
         { profile_id: profile.id, module, ...updates, updated_at: new Date().toISOString() },
         { onConflict: 'profile_id,module' }
       )
-    } catch (_) {
+    } catch {
       // Netwerk-fout: ga door met lokale state
     }
   }
+
+  const handleSelectFromHome = (target) => {
+    // target = module ID (number) of 'world:cardId' string
+    if (typeof target === 'string' && target.startsWith('world:')) {
+      const cardId = target.replace('world:', '')
+      debugLog('Scherm', `world-sub: ${cardId}`)
+      setActiveWorld(cardId)
+      setScreen('world-sub')
+    } else {
+      debugLog('Scherm', `game${target}`)
+      setScreen(`game${target}`)
+    }
+  }
+
+  const handleBack = () => {
+    setActiveWorld(null)
+    setProfile(null)
+    setProgressMap({})
+    setScreen('profiles')
+  }
+
+  const handleBackToHome = () => {
+    setActiveWorld(null)
+    setScreen('home')
+  }
+
+  // ---- Screens ----
 
   if (screen === 'splash') {
     return (
@@ -93,22 +147,45 @@ export default function Root() {
   if (screen === 'profiles') {
     return <ProfileScreen onSelect={handleProfileSelect} />
   }
-  if (screen === 'modules') {
+
+  if (screen === 'sami-intro') {
     return (
-      <ModuleSelect
-        profile={profile}
-        onSelect={(mod) => setScreen(`game${mod}`)}
-        onBack={() => { setScreen('profiles'); setProfile(null); setProgressMap({}) }}
+      <SamiIntro
+        childName={profile?.child_name ?? ''}
+        onDone={handleSamiIntroDone}
       />
     )
   }
+
+  if (screen === 'home') {
+    return (
+      <HomeScreen
+        profile={profile}
+        progressMap={progressMap}
+        onSelectModule={handleSelectFromHome}
+        onBack={handleBack}
+      />
+    )
+  }
+
+  if (screen === 'world-sub') {
+    return (
+      <WorldSubSelect
+        worldCardId={activeWorld}
+        progressMap={progressMap}
+        onSelect={(moduleId) => setScreen(`game${moduleId}`)}
+        onBack={handleBackToHome}
+      />
+    )
+  }
+
   if (screen === 'game1') {
     return (
       <App
         profile={profile}
         savedProgress={progressMap[1] ?? null}
         onProgressUpdate={(u) => handleProgressUpdate(1, u)}
-        onBack={() => setScreen('modules')}
+        onBack={handleBackToHome}
       />
     )
   }
@@ -118,7 +195,7 @@ export default function Root() {
         profile={profile}
         savedProgress={progressMap[2] ?? null}
         onProgressUpdate={(u) => handleProgressUpdate(2, u)}
-        onBack={() => setScreen('modules')}
+        onBack={handleBackToHome}
       />
     )
   }
@@ -128,9 +205,50 @@ export default function Root() {
         profile={profile}
         savedProgress={progressMap[3] ?? null}
         onProgressUpdate={(u) => handleProgressUpdate(3, u)}
-        onBack={() => setScreen('modules')}
+        onBack={handleBackToHome}
       />
     )
   }
+  if (screen === 'game4') {
+    return (
+      <PatroonGame
+        profile={profile}
+        savedProgress={progressMap[4] ?? null}
+        onProgressUpdate={(u) => handleProgressUpdate(4, u)}
+        onBack={handleBackToHome}
+      />
+    )
+  }
+  if (screen === 'game5') {
+    return (
+      <SimonGame
+        profile={profile}
+        savedProgress={progressMap[5] ?? null}
+        onProgressUpdate={(u) => handleProgressUpdate(5, u)}
+        onBack={handleBackToHome}
+      />
+    )
+  }
+  if (screen === 'game6') {
+    return (
+      <KlokGame
+        profile={profile}
+        savedProgress={progressMap[6] ?? null}
+        onProgressUpdate={(u) => handleProgressUpdate(6, u)}
+        onBack={handleBackToHome}
+      />
+    )
+  }
+  if (screen === 'game7') {
+    return (
+      <RekenGame
+        profile={profile}
+        savedProgress={progressMap[7] ?? null}
+        onProgressUpdate={(u) => handleProgressUpdate(7, u)}
+        onBack={handleBackToHome}
+      />
+    )
+  }
+
   return null
 }

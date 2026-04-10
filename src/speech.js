@@ -5,6 +5,8 @@
 // Gebruikt blob-URL's om MIME-type problemen met .webm te voorkomen
 // ============================================================
 
+import { debugLog } from './debugLogger'
+
 const blobCache = {}   // id → blob URL (eenmalig gefetcht)
 const audioCache = {}  // id → Audio element (hergebruikt)
 let generation = 0     // voorkomt dat stale fetches nog afspelen
@@ -22,12 +24,12 @@ function handleUnlock() {
     const buf = ctx.createBuffer(1, 1, 22050)
     const src = ctx.createBufferSource()
     src.buffer = buf; src.connect(ctx.destination); src.start(0)
-  } catch (_) {}
+  } catch { /* niet beschikbaar */ }
   try {
     const u = new SpeechSynthesisUtterance('')
     u.volume = 0
     window.speechSynthesis.speak(u)
-  } catch (_) {}
+  } catch { /* niet beschikbaar */ }
   unlockResolve()
   ;['touchstart', 'click', 'keydown'].forEach(e =>
     document.removeEventListener(e, handleUnlock, true)
@@ -41,7 +43,7 @@ function stopAll() {
   generation++
   window.speechSynthesis.cancel()
   Object.values(audioCache).forEach(a => {
-    try { a.pause(); a.currentTime = 0 } catch (_) {}
+    try { a.pause(); a.currentTime = 0 } catch { /* niet beschikbaar */ }
   })
 }
 
@@ -101,15 +103,23 @@ export function speakItem(id, text, { onEnd, ttsRate = 0.85 } = {}) {
   stopAll()
   const gen = generation
 
+  // Timeout-fallback: als audio én TTS niet werkten binnen 8s, roep onEnd toch aan.
+  // Voorkomt dat het spel vastloopt bij autoplay-blokkade of netwerkfouten.
+  let onEndCalled = false
+  const safeOnEnd = onEnd ? () => { if (!onEndCalled) { onEndCalled = true; onEnd() } } : null
+  if (safeOnEnd) setTimeout(safeOnEnd, 8000)
+
   audioUnlocked.then(() => {
     if (gen !== generation) return
     return loadStudio(id).then(url => {
       if (gen !== generation) return
       if (!url) throw new Error('no file')
-      return playBlob(id, url, onEnd)
+      debugLog('Audio gestart', `studio: ${id}`)
+      return playBlob(id, url, safeOnEnd)
     }).catch(() => {
       if (gen !== generation) return
-      tts(text, { onEnd, rate: ttsRate })
+      debugLog('Audio gestart', `TTS fallback: "${text}"`)
+      tts(text, { onEnd: safeOnEnd, rate: ttsRate })
     })
   })
 }

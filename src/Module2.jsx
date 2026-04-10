@@ -170,7 +170,7 @@ export default function Module2({ profile = null, savedProgress = null, onProgre
       source.buffer = buffer
       source.connect(ctx.destination)
       source.start(0)
-    } catch (_) {}
+    } catch { /* niet beschikbaar */ }
 
     const startStars = savedProgress?.total_stars ?? 0
     let { groupIndex: startGroup, phase: startPhase } = decodeLevel(savedProgress?.current_level)

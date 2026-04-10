@@ -134,3 +134,148 @@ body {
   85% { opacity: 1; }
   100% { top: 95%; opacity: 0; transform: rotate(360deg); }
 }
+
+/* ============================================================
+   SAMI DE SALAMANDER — animaties
+   ============================================================ */
+
+/* Idle: subtiele ademhaling */
+@keyframes sami-breathe {
+  0%, 100% { transform: scaleY(1) scaleX(1); }
+  50% { transform: scaleY(1.04) scaleX(0.98); }
+}
+
+.sami-idle {
+  animation: sami-breathe 3s ease-in-out infinite;
+  transform-origin: center bottom;
+}
+
+/* Happy: springt kort omhoog */
+@keyframes sami-jump {
+  0%   { transform: translateY(0) scale(1); }
+  30%  { transform: translateY(-16px) scale(1.05, 0.97); }
+  55%  { transform: translateY(-10px) scale(1.03, 0.99); }
+  80%  { transform: translateY(-4px) scale(1.01, 1); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+.sami-happy {
+  animation: sami-jump 0.6s ease-out forwards;
+}
+
+/* Proud: stabiel met ster boven hoofd */
+.sami-proud {
+  animation: sami-breathe 3s ease-in-out infinite;
+}
+
+/* Thinking: hoofdje licht schuin */
+@keyframes sami-tilt {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(-8deg); }
+}
+
+.sami-thinking {
+  animation: sami-tilt 1.5s ease-in-out infinite;
+  transform-origin: center bottom;
+}
+
+/* Sad: licht omlaag zakken */
+@keyframes sami-droop {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(4px); }
+}
+
+.sami-sad {
+  animation: sami-droop 1s ease-in-out infinite;
+}
+
+/* Celebrating: springt 3x, armen omhoog */
+@keyframes sami-celebrate {
+  0%   { transform: translateY(0) scale(1); }
+  15%  { transform: translateY(-20px) scale(1.05, 0.95); }
+  30%  { transform: translateY(0) scale(0.97, 1.03); }
+  45%  { transform: translateY(-18px) scale(1.05, 0.95); }
+  60%  { transform: translateY(0) scale(0.97, 1.03); }
+  75%  { transform: translateY(-14px) scale(1.04, 0.96); }
+  90%  { transform: translateY(0) scale(1); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+.sami-celebrating {
+  animation: sami-celebrate 1.2s ease-out forwards;
+}
+
+/* Excited: trilt van enthousiasme */
+@keyframes sami-excited {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  20%  { transform: scale(1.06, 0.96) rotate(-3deg); }
+  40%  { transform: scale(0.96, 1.06) rotate(3deg); }
+  60%  { transform: scale(1.06, 0.96) rotate(-2deg); }
+  80%  { transform: scale(0.98, 1.02) rotate(2deg); }
+}
+
+.sami-excited {
+  animation: sami-excited 0.5s ease-in-out infinite;
+}
+
+/* Intro-screen transitions */
+.sami-intro-entering {
+  animation: fadeInUp 0.4s ease-out;
+}
+
+.sami-intro-leaving {
+  animation: fadeOutUp 0.5s ease-in forwards;
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeOutUp {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to   { opacity: 0; transform: translateY(-30px) scale(0.9); }
+}
+
+/* Sami star badge pulse */
+@keyframes star-badge-pulse {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  50% { transform: scale(1.2) rotate(15deg); }
+}
+
+.sami-star-badge {
+  animation: star-badge-pulse 1s ease-in-out infinite;
+  transform-origin: center;
+}
+
+/* Traan druppel */
+@keyframes tear-drop {
+  0% { transform: translateY(0); opacity: 1; }
+  100% { transform: translateY(8px); opacity: 0; }
+}
+
+.sami-tear {
+  animation: tear-drop 1s ease-in infinite;
+}
+
+/* ---- Reduced motion: alle Sami animaties uitschakelen ---- */
+@media (prefers-reduced-motion: reduce) {
+  .sami-idle, .sami-happy, .sami-proud, .sami-thinking,
+  .sami-sad, .sami-celebrating, .sami-excited,
+  .sami-intro-entering, .sami-intro-leaving,
+  .sami-star-badge, .sami-tear {
+    animation: none;
+  }
+}
+
+/* ============================================================
+   WOORD-BLOK puls (bij audio afspelen)
+   ============================================================ */
+@keyframes word-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); }
+}
+
+.animate-word-pulse {
+  animation: word-pulse 0.3s ease-in-out;
+}

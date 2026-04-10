@@ -131,7 +131,7 @@ function App({ profile = null, savedProgress = null, onProgressUpdate = null, on
       source.buffer = buffer
       source.connect(ctx.destination)
       source.start(0)
-    } catch (e) { /* ignore */ }
+    } catch { /* ignore */ }
 
     // Laad voortgang uit savedProgress als beschikbaar
     let startLevel = savedProgress?.current_level ?? 0
@@ -201,10 +201,8 @@ function App({ profile = null, savedProgress = null, onProgressUpdate = null, on
       // Star progress
       const newProgress = starProgress + 1
       let newStars = stars
-      let newStarProgress = newProgress
       if (newProgress >= 10) {
         newStars = stars + 1
-        newStarProgress = 0
         setStars(newStars)
         setStarProgress(0)
         setNewStar(true)
