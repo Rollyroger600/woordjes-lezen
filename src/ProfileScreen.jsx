@@ -22,7 +22,7 @@ function PinDots({ length, filled }) {
   )
 }
 
-function PinPad({ pin, onDigit, onDelete }) {
+function PinPad({ onDigit, onDelete }) {
   const digits = [1, 2, 3, 4, 5, 6, 7, 8, 9, null, 0, 'del']
   return (
     <div className="grid grid-cols-3 gap-3 w-full max-w-xs mx-auto">

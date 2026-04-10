@@ -84,6 +84,34 @@ public/audio/*.m4a        # 15 legacy Module 1 woorden
 - Elke Module 1 woord heeft een vaste kleur (CSS vars + WORD_COLORS)
 - Animaties: shake, wobble-subtle/strong, pop, star-appear, pulse-gentle, butterfly-fly, frog-jump, star-fall, flame-pulse
 
+## Debug Logging (Cowork / handmatig testen)
+
+`src/debugLogger.js` bevat een schakelaar voor console-logging. **Logt nooit in productie** (Vercel) — alleen in `npm run dev`.
+
+**Aan/uit zetten:** open `debugLogger.js` en zet `DEBUG_ENABLED`:
+```js
+const DEBUG_ENABLED = true   // aan: logs zichtbaar in browser-console
+const DEBUG_ENABLED = false  // uit: volledig stil, klaar voor productie
+```
+
+**Wat wordt gelogd:**
+- Schermwisselingen (`[tijd] Scherm: home`)
+- Audio: studio-bestand of TTS fallback (`[tijd] Audio gestart: studio: sami-welkom`)
+- Sami state (`[tijd] Sami state: celebrating`)
+- Antwoorden per module (`[tijd] RekenGame antwoord: fout: gekozen 8, correct: 7`)
+- Level-transities (`[tijd] Level: Optellen tot 5 → Optellen tot 10`)
+
+**Bestanden met debugLog-aanroepen:**
+`speech.js`, `Root.jsx`, `PatroonGame.jsx`, `SimonGame.jsx`, `KlokGame.jsx`, `RekenGame.jsx`
+
+**Nieuwe modules toevoegen:**
+```js
+import { debugLog } from './debugLogger'
+debugLog('MijnModule antwoord', isCorrect ? 'correct' : 'fout')
+debugLog('Sami state', newState)
+debugLog('Level', `${oudLevel} → ${nieuwLevel}`)
+```
+
 ## Commands
 - `npm run dev` — development server
 - `npm run build` — productie build

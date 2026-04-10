@@ -200,4 +200,55 @@ export const SPEECH_ITEMS = [
   { id: 'woord-tafel', text: 'tafel', category: 'Rijmen — woorden', usedIn: 'ring/tafel' },
   { id: 'woord-been',  text: 'been',  category: 'Rijmen — woorden', usedIn: 'steen/been' },
   { id: 'woord-bloem', text: 'bloem', category: 'Rijmen — woorden', usedIn: 'steen/bloem' },
+
+  // ---- Sami introductie ----
+  { id: 'sami-welkom',  text: 'Hallo! Ik ben Sami!',                   category: 'Sami', usedIn: 'Intro stap 1' },
+  { id: 'sami-naam',    text: 'Mijn naam is Sami de Salamander',        category: 'Sami', usedIn: 'Intro stap 1' },
+  { id: 'sami-maatje',  text: 'Ik ben jouw maatje in deze app',         category: 'Sami', usedIn: 'Intro stap 2' },
+  { id: 'sami-helpen',  text: 'Ik help je leren lezen en rekenen',      category: 'Sami', usedIn: 'Intro stap 2' },
+  { id: 'sami-klaar',   text: 'Ben je er klaar voor? Laten we beginnen!', category: 'Sami', usedIn: 'Intro stap 3' },
+  { id: 'sami-goed',    text: 'Goed gedaan!',                           category: 'Sami', usedIn: 'Positieve feedback' },
+  { id: 'sami-super',   text: 'Super!',                                 category: 'Sami', usedIn: 'Positieve feedback' },
+  { id: 'sami-probeer', text: 'Probeer het nog eens!',                  category: 'Sami', usedIn: 'Negatieve feedback' },
+  { id: 'sami-bijna',   text: 'Bijna! Nog één keer!',                   category: 'Sami', usedIn: 'Negatieve feedback' },
+  { id: 'sami-ster',    text: 'Je hebt een ster verdiend!',             category: 'Sami', usedIn: 'Ster verdienen' },
+
+  // ---- Module 4: Patroon herkennen ----
+  { id: 'patroon-intro', text: 'Onthoud de gekleurde vakjes!',              category: 'Patroon', usedIn: 'Start ronde' },
+  { id: 'patroon-klaar', text: 'Welke vakjes waren gekleurd?',              category: 'Patroon', usedIn: 'Na verbergen' },
+  { id: 'patroon-goed',  text: 'Je hebt ze allemaal onthouden!',            category: 'Patroon', usedIn: 'Goed antwoord' },
+  { id: 'patroon-fout',  text: 'Niet helemaal, probeer het nog eens!',      category: 'Patroon', usedIn: 'Fout antwoord' },
+
+  // ---- Module 5: Kleurenreeks (Simon) ----
+  { id: 'reeks-intro',  text: 'Doe de reeks na!',                           category: 'Reeks', usedIn: 'Start' },
+  { id: 'reeks-kijk',   text: 'Kijk goed...',                               category: 'Reeks', usedIn: 'Reeks afspelen' },
+  { id: 'reeks-jij',    text: 'Nu jij!',                                    category: 'Reeks', usedIn: 'Beurt kind' },
+  { id: 'reeks-goed',   text: 'Helemaal goed!',                             category: 'Reeks', usedIn: 'Goed antwoord' },
+  { id: 'reeks-langer', text: 'De reeks wordt langer!',                     category: 'Reeks', usedIn: 'Level omhoog' },
+  { id: 'reeks-nieuw',  text: 'Er komt een nieuwe kleur bij!',              category: 'Reeks', usedIn: 'Nieuwe kleur' },
+
+  // ---- Module 6: Klokkijken ----
+  { id: 'klok-intro',        text: 'Leren klokkijken!',                          category: 'Klok', usedIn: 'Intro' },
+  { id: 'klok-uitleg-groot', text: 'De grote wijzer wijst de minuten',            category: 'Klok', usedIn: 'Uitleg scherm' },
+  { id: 'klok-uitleg-klein', text: 'De kleine wijzer wijst de uren',              category: 'Klok', usedIn: 'Uitleg scherm' },
+  { id: 'klok-vraag',        text: 'Hoe laat is het?',                            category: 'Klok', usedIn: 'Per vraag' },
+  { id: 'klok-heel',         text: 'Hele uren',                                   category: 'Klok', usedIn: 'Fase 1 intro' },
+  { id: 'klok-half',         text: 'Nu leren we ook de halve uren!',              category: 'Klok', usedIn: 'Fase 2 intro' },
+  { id: 'klok-goed',         text: 'Dat klopt!',                                  category: 'Klok', usedIn: 'Goed antwoord' },
+  { id: 'klok-fout',         text: 'Dat klopt niet, probeer het nog eens!',       category: 'Klok', usedIn: 'Fout antwoord' },
+
+  // ---- Module 7: Rekenen ----
+  { id: 'rekenen-intro', text: 'Leren optellen en aftrekken!',                    category: 'Rekenen', usedIn: 'Start' },
+  { id: 'rekenen-plus',  text: 'plus',                                            category: 'Rekenen', usedIn: 'Operator in som' },
+  { id: 'rekenen-min',   text: 'min',                                             category: 'Rekenen', usedIn: 'Operator in som' },
+  { id: 'rekenen-goed',  text: 'Helemaal goed!',                                  category: 'Rekenen', usedIn: 'Goed antwoord' },
+  { id: 'rekenen-fout',  text: 'Niet helemaal, probeer het nog eens!',            category: 'Rekenen', usedIn: 'Fout antwoord' },
+
+  // ---- Getallen 0–20 (voor rekenen) ----
+  ...Array.from({ length: 21 }, (_, i) => ({
+    id: `getal-${i}`,
+    text: String(i),
+    category: 'Rekenen — getallen',
+    usedIn: 'Rekensom uitspreken',
+  })),
 ]

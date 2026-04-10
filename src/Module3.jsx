@@ -120,7 +120,7 @@ export default function Module3({ profile = null, savedProgress = null, onProgre
       const buf = ctx.createBuffer(1, 1, 22050)
       const src = ctx.createBufferSource()
       src.buffer = buf; src.connect(ctx.destination); src.start(0)
-    } catch (_) {}
+    } catch { /* niet beschikbaar */ }
 
     const startStars = savedProgress?.total_stars ?? 0
     setGameStarted(true)
