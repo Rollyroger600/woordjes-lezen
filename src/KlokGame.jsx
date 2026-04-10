@@ -8,27 +8,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Salamander from './Salamander'
 import { speakItem, stopAll } from './speech'
+import { playClick, playCorrect, playWrong, playStar, playCombo } from './sounds'
 import { debugLog } from './debugLogger'
 
 const font = { fontFamily: 'OpenDyslexic, sans-serif' }
-
-function playTone(freq, durationMs, type = 'sine') {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)()
-    const osc = ctx.createOscillator()
-    const gain = ctx.createGain()
-    osc.connect(gain); gain.connect(ctx.destination)
-    osc.type = type
-    osc.frequency.value = freq
-    gain.gain.setValueAtTime(0.3, ctx.currentTime)
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + durationMs / 1000)
-    osc.start(); osc.stop(ctx.currentTime + durationMs / 1000)
-  } catch { /* audio niet beschikbaar */ }
-}
-
-function playStarSound() {
-  [523, 659, 784].forEach((f, i) => setTimeout(() => playTone(f, 200), i * 200))
-}
 
 // ---- SVG Klok component ----
 function AnalogClock({ hour, minute, size = 220, animateIntro = false }) {
@@ -306,9 +289,18 @@ export default function KlokGame({ savedProgress, onProgressUpdate, onBack }) {
     }
   }, [klokPhase])
 
+  // ---- Uitleg herhalen via Sami ----
+  const handleSamiPress = () => {
+    stopAll()
+    speakItem('uitleg-klok', 'Kijk goed naar de klok! De kleine wijzer wijst de uren, de grote wijzer wijst de minuten. Kies de juiste tijd!')
+    setSamiState('happy')
+    setTimeout(() => setSamiState('idle'), 2000)
+  }
+
   const handleAnswer = (opt) => {
     if (answerResult) return
     stopAll()
+    playClick()
     setSelectedOpt(opt)
 
     const correctLabel = timeLabel(currentTime.hour, currentTime.minute)
@@ -318,7 +310,6 @@ export default function KlokGame({ savedProgress, onProgressUpdate, onBack }) {
       debugLog('KlokGame antwoord', `correct: ${chosenLabel}`)
       setSamiState('happy')
       setAnswerResult('correct')
-      playTone(880, 150)
       const newCorrect = consecutiveCorrect + 1
       setConsecutiveCorrect(newCorrect)
 
@@ -330,9 +321,12 @@ export default function KlokGame({ savedProgress, onProgressUpdate, onBack }) {
         newStars = totalStars + 1
         setTotalStars(newStars)
         setSessionStars(s => s + 1)
-        playStarSound()
+        playStar()
+        playCombo()
         setSamiState('celebrating')
         debugLog('Sami state', 'celebrating')
+      } else {
+        playCorrect()
       }
 
       // Naar fase 2 na 10x goed fase 1
@@ -351,12 +345,12 @@ export default function KlokGame({ savedProgress, onProgressUpdate, onBack }) {
         clock_intro_seen: true,
       })
 
-      setTimeout(() => { setSamiState('idle'); nextQuestion() }, 1800)
+      setTimeout(() => { setSamiState('idle'); nextQuestion() }, 1400)
     } else {
       debugLog('KlokGame antwoord', `fout: gekozen ${chosenLabel}, correct: ${correctLabel}`)
       setSamiState('sad')
       setAnswerResult('wrong')
-      playTone(220, 300, 'square')
+      playWrong()
       setConsecutiveCorrect(0)
 
       speakItem('klok-fout', 'Dat klopt niet, probeer het nog eens!')
@@ -368,7 +362,7 @@ export default function KlokGame({ savedProgress, onProgressUpdate, onBack }) {
         clock_intro_seen: true,
       })
 
-      setTimeout(() => { setSamiState('idle'); nextQuestion() }, 2500)
+      setTimeout(() => { setSamiState('idle'); nextQuestion() }, 1800)
     }
   }
 
@@ -452,9 +446,14 @@ export default function KlokGame({ savedProgress, onProgressUpdate, onBack }) {
         })}
       </div>
 
-      {/* Sami rechtsonder */}
-      <div style={{ position: 'fixed', bottom: 16, right: 16 }}>
+      {/* Sami rechtsonder — klikbaar voor uitleg */}
+      <div
+        style={{ position: 'fixed', bottom: 16, right: 16, cursor: 'pointer', textAlign: 'center' }}
+        onClick={handleSamiPress}
+        title="Tik op Sami voor uitleg"
+      >
         <Salamander state={samiState} size="sm" />
+        <div style={{ color: '#555', fontSize: '0.65rem', marginTop: 2, ...font }}>❓ uitleg</div>
       </div>
     </div>
   )

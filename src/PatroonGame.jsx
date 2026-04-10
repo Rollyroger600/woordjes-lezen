@@ -7,12 +7,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Salamander from './Salamander'
 import { speakItem, stopAll } from './speech'
+import { playTone, playClick, playCorrect, playWrong, playStar, playCombo } from './sounds'
 import { debugLog } from './debugLogger'
 
 const font = { fontFamily: 'OpenDyslexic, sans-serif' }
 
-// ---- Adaptieve levels ----
-// Elke stap: [gridSize, numCells, showMs]
 const DIFFICULTY_STEPS = [
   [3, 2, 3000],
   [3, 3, 3000],
@@ -38,26 +37,7 @@ function pickRandomCells(gridSize, count) {
   return new Set(indices.slice(0, count))
 }
 
-// Web Audio API geluid helpers
-function playTone(freq, durationMs, type = 'sine') {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)()
-    const osc = ctx.createOscillator()
-    const gain = ctx.createGain()
-    osc.connect(gain); gain.connect(ctx.destination)
-    osc.type = type
-    osc.frequency.value = freq
-    gain.gain.setValueAtTime(0.3, ctx.currentTime)
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + durationMs / 1000)
-    osc.start(); osc.stop(ctx.currentTime + durationMs / 1000)
-  } catch { /* audio niet beschikbaar */ }
-}
-
-function playCorrectSound() { playTone(880, 150) }
-function playWrongSound()   { playTone(220, 300, 'square') }
-function playStarSound() {
-  [523, 659, 784].forEach((f, i) => setTimeout(() => playTone(f, 200), i * 200))
-}
+function playFlashTone() { playTone(700, 120, 'sine') }
 
 export default function PatroonGame({ savedProgress, onProgressUpdate, onBack }) {
   // Progress state
@@ -107,9 +87,18 @@ export default function PatroonGame({ savedProgress, onProgressUpdate, onBack })
     return () => clearTimeout(t)
   }, [startRound])
 
+  // ---- Uitleg herhalen via Sami ----
+  const handleSamiPress = () => {
+    stopAll()
+    speakItem('uitleg-patroon', 'Kijk welke vakjes oplichten! Onthoud ze goed en tik ze daarna zelf aan!')
+    setSamiState('happy')
+    setTimeout(() => setSamiState('idle'), 2000)
+  }
+
   // ---- Cel toggle tijdens input fase ----
   const toggleCell = (idx) => {
     if (phase !== 'input') return
+    playClick()
     setSelectedCells(prev => {
       const next = new Set(prev)
       if (next.has(idx)) next.delete(idx)
@@ -121,13 +110,13 @@ export default function PatroonGame({ savedProgress, onProgressUpdate, onBack })
   // ---- Check antwoord ----
   const checkAnswer = () => {
     if (phase !== 'input') return
+    playClick()
     stopAll()
     setPhase('feedback')
 
     const fb = {}
     let allCorrect = true
 
-    // Goede vakjes groen, gemiste vakjes rood tonen
     targetCells.forEach(idx => {
       if (selectedCells.has(idx)) {
         fb[idx] = 'correct'
@@ -136,7 +125,6 @@ export default function PatroonGame({ savedProgress, onProgressUpdate, onBack })
         allCorrect = false
       }
     })
-    // Fout gekozen vakjes ook rood
     selectedCells.forEach(idx => {
       if (!targetCells.has(idx)) {
         fb[idx] = 'wrong'
@@ -147,36 +135,32 @@ export default function PatroonGame({ savedProgress, onProgressUpdate, onBack })
 
     if (allCorrect) {
       debugLog('PatroonGame antwoord', 'correct')
-      playCorrectSound()
-      setSamiState('happy')
       const newCorrect = consecutiveCorrect + 1
       setConsecutiveCorrect(newCorrect)
       setConsecutiveWrong(0)
 
-      // Ster na 3 rondes goed
       let newStars = totalStars
       let newStep = diffStep
 
       if (newCorrect % 3 === 0) {
-        // Ster verdienen
+        playCombo()
         newStars = totalStars + 1
         setTotalStars(newStars)
         setStars(s => s + 1)
-        playStarSound()
+        playStar()
         setSamiState('celebrating')
         debugLog('Sami state', 'celebrating')
         speakItem('patroon-goed', 'Je hebt ze allemaal onthouden!', {
-          onEnd: () => {
-            speakItem('sami-ster', 'Je hebt een ster verdiend!')
-          },
+          onEnd: () => speakItem('sami-ster', 'Je hebt een ster verdiend!'),
         })
-        // Level omhoog
         if (diffStep < DIFFICULTY_STEPS.length - 1) {
           newStep = diffStep + 1
           debugLog('Level', `${diffStep} → ${newStep}`)
           setDiffStep(newStep)
         }
       } else {
+        playCorrect()
+        setSamiState('happy')
         speakItem('patroon-goed', 'Je hebt ze allemaal onthouden!')
       }
 
@@ -190,10 +174,10 @@ export default function PatroonGame({ savedProgress, onProgressUpdate, onBack })
       setTimeout(() => {
         setSamiState('idle')
         startRound()
-      }, 2200)
+      }, 1400)
     } else {
       debugLog('PatroonGame antwoord', 'fout')
-      playWrongSound()
+      playWrong()
       setSamiState('sad')
       const newWrong = consecutiveWrong + 1
       setConsecutiveWrong(newWrong)
@@ -205,9 +189,7 @@ export default function PatroonGame({ savedProgress, onProgressUpdate, onBack })
         setDiffStep(newStep)
       }
 
-      speakItem('patroon-fout', 'Niet helemaal, probeer het nog eens!', {
-        onEnd: () => speakItem('sami-probeer', 'Probeer het nog eens!'),
-      })
+      speakItem('patroon-fout', 'Niet helemaal, probeer het nog eens!')
 
       onProgressUpdate?.({
         current_level: newStep,
@@ -219,7 +201,7 @@ export default function PatroonGame({ savedProgress, onProgressUpdate, onBack })
       setTimeout(() => {
         setSamiState('idle')
         startRound()
-      }, 2500)
+      }, 1800)
     }
   }
 
@@ -326,9 +308,14 @@ export default function PatroonGame({ savedProgress, onProgressUpdate, onBack })
         </button>
       )}
 
-      {/* Sami rechtsonder */}
-      <div style={{ position: 'fixed', bottom: 16, right: 16 }}>
+      {/* Sami rechtsonder — klikbaar voor uitleg */}
+      <div
+        style={{ position: 'fixed', bottom: 16, right: 16, cursor: 'pointer', textAlign: 'center' }}
+        onClick={handleSamiPress}
+        title="Tik op Sami voor uitleg"
+      >
         <Salamander state={samiState} size="sm" />
+        <div style={{ color: '#999', fontSize: '0.65rem', marginTop: 2, ...font }}>❓ uitleg</div>
       </div>
     </div>
   )

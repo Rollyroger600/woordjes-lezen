@@ -7,6 +7,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Salamander from './Salamander'
 import { speakItem, stopAll } from './speech'
+import { playClick, playCorrect, playWrong, playStar, playCombo } from './sounds'
 import { debugLog } from './debugLogger'
 
 const font = { fontFamily: 'OpenDyslexic, sans-serif' }
@@ -63,26 +64,6 @@ function generateOptions(correct, max) {
     [arr[i], arr[j]] = [arr[j], arr[i]]
   }
   return arr
-}
-
-function playTone(freq, durationMs, type = 'sine') {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)()
-    const osc = ctx.createOscillator()
-    const gain = ctx.createGain()
-    osc.connect(gain); gain.connect(ctx.destination)
-    osc.type = type
-    osc.frequency.value = freq
-    gain.gain.setValueAtTime(0.3, ctx.currentTime)
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + durationMs / 1000)
-    osc.start(); osc.stop(ctx.currentTime + durationMs / 1000)
-  } catch { /* audio niet beschikbaar */ }
-}
-
-function playCorrectSound() { playTone(880, 150) }
-function playWrongSound()   { playTone(220, 300, 'square') }
-function playStarSound() {
-  [523, 659, 784].forEach((f, i) => setTimeout(() => playTone(f, 200), i * 200))
 }
 
 // Spreek een som uit via audio-bestanden + TTS fallback
@@ -147,16 +128,24 @@ export default function RekenGame({ savedProgress, onProgressUpdate, onBack }) {
     return () => stopAll()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ---- Uitleg herhalen via Sami ----
+  const handleSamiPress = () => {
+    stopAll()
+    speakItem('uitleg-rekenen', 'Luister naar de som! Hoeveel is het antwoord? Tik op het juiste getal!')
+    setSamiState('happy')
+    setTimeout(() => setSamiState('idle'), 2000)
+  }
+
   const handleAnswer = (opt) => {
     if (answerResult) return
     stopAll()
+    playClick()
     setSelectedOpt(opt)
 
     if (opt === currentSum.answer) {
       debugLog('RekenGame antwoord', `correct: ${opt}`)
       setSamiState('happy')
       setAnswerResult('correct')
-      playCorrectSound()
 
       const newCC = consecutiveCorrect + 1
       setCC(newCC)
@@ -178,9 +167,12 @@ export default function RekenGame({ savedProgress, onProgressUpdate, onBack }) {
         newStars = totalStars + 1
         setTotalStars(newStars)
         setSessionStars(s => s + 1)
-        playStarSound()
+        playStar()
+        playCombo()
         setSamiState('celebrating')
         debugLog('Sami state', 'celebrating')
+      } else {
+        playCorrect()
       }
 
       speakItem('rekenen-goed', 'Helemaal goed!')
@@ -191,12 +183,12 @@ export default function RekenGame({ savedProgress, onProgressUpdate, onBack }) {
         consecutive_wrong: 0,
       })
 
-      setTimeout(() => { setSamiState('idle'); nextQuestion() }, 1600)
+      setTimeout(() => { setSamiState('idle'); nextQuestion() }, 1400)
     } else {
       debugLog('RekenGame antwoord', `fout: gekozen ${opt}, correct: ${currentSum.answer}`)
       setSamiState('sad')
       setAnswerResult('wrong')
-      playWrongSound()
+      playWrong()
 
       const newCW = consecutiveWrong + 1
       setCW(newCW)
@@ -218,7 +210,7 @@ export default function RekenGame({ savedProgress, onProgressUpdate, onBack }) {
         consecutive_wrong: newCW,
       })
 
-      setTimeout(() => { setSamiState('idle'); nextQuestion() }, 2200)
+      setTimeout(() => { setSamiState('idle'); nextQuestion() }, 1800)
     }
   }
 
@@ -323,9 +315,14 @@ export default function RekenGame({ savedProgress, onProgressUpdate, onBack }) {
         })}
       </div>
 
-      {/* Sami rechtsonder */}
-      <div style={{ position: 'fixed', bottom: 16, right: 16 }}>
+      {/* Sami rechtsonder — klikbaar voor uitleg */}
+      <div
+        style={{ position: 'fixed', bottom: 16, right: 16, cursor: 'pointer', textAlign: 'center' }}
+        onClick={handleSamiPress}
+        title="Tik op Sami voor uitleg"
+      >
         <Salamander state={samiState} size="sm" />
+        <div style={{ color: '#555', fontSize: '0.65rem', marginTop: 2, ...font }}>❓ uitleg</div>
       </div>
     </div>
   )

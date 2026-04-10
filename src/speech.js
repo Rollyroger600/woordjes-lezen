@@ -107,7 +107,7 @@ export function speakItem(id, text, { onEnd, ttsRate = 0.85 } = {}) {
   // Voorkomt dat het spel vastloopt bij autoplay-blokkade of netwerkfouten.
   let onEndCalled = false
   const safeOnEnd = onEnd ? () => { if (!onEndCalled) { onEndCalled = true; onEnd() } } : null
-  if (safeOnEnd) setTimeout(safeOnEnd, 8000)
+  if (safeOnEnd) setTimeout(safeOnEnd, 3000)
 
   audioUnlocked.then(() => {
     if (gen !== generation) return

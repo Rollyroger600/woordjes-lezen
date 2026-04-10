@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import confetti from 'canvas-confetti'
 import { pickMiniGame } from './MiniGamePicker'
-import { speakItem, speakWord } from './speech'
+import { speakItem, speakWord, stopAll } from './speech'
+import { playClick, playCorrect, playWrong, playStar } from './sounds'
+import Salamander from './Salamander'
 
 const LEVELS = [
   ['de', 'het', 'een'],
@@ -65,6 +67,7 @@ function App({ profile = null, savedProgress = null, onProgressUpdate = null, on
   const [newStar, setNewStar] = useState(false)
   const [transitioning, setTransitioning] = useState(false)
   const [allDone, setAllDone] = useState(false)
+  const [samiState, setSamiState] = useState('idle')
 
   // Blok van 10 vragen
   const [roundCount, setRoundCount] = useState(0)
@@ -180,6 +183,8 @@ function App({ profile = null, savedProgress = null, onProgressUpdate = null, on
       clearHintTimers()
       setPopWord(word)
       setTransitioning(true)
+      setSamiState('happy')
+      playClick()
 
       // Confetti
       confetti({
@@ -206,8 +211,11 @@ function App({ profile = null, savedProgress = null, onProgressUpdate = null, on
         setStars(newStars)
         setStarProgress(0)
         setNewStar(true)
-        setTimeout(() => setNewStar(false), 600)
+        playStar()
+        setSamiState('celebrating')
+        setTimeout(() => { setNewStar(false); setSamiState('idle') }, 1500)
       } else {
+        playCorrect()
         setStarProgress(newProgress)
       }
 
@@ -262,6 +270,7 @@ function App({ profile = null, savedProgress = null, onProgressUpdate = null, on
       setTimeout(() => {
         setPopWord(null)
         setTransitioning(false)
+        setSamiState('idle')
         if (newRoundCount > 0 && newRoundCount % 10 === 0) {
           // Mini-game na 10 vragen — kies random
           nextRoundAfterGameRef.current = { level: nextLevel, count: nextCount }
@@ -275,6 +284,8 @@ function App({ profile = null, savedProgress = null, onProgressUpdate = null, on
     } else {
       // Wrong
       setShakeWord(word)
+      setSamiState('sad')
+      playWrong()
       const newErrorStreak = errorStreak + 1
       setErrorStreak(newErrorStreak)
       setStreak(0)
@@ -304,7 +315,7 @@ function App({ profile = null, savedProgress = null, onProgressUpdate = null, on
 
       // Repeat the word
       setTimeout(() => speakWord(targetWord), 500)
-      setTimeout(() => setShakeWord(null), 500)
+      setTimeout(() => { setShakeWord(null); setSamiState('idle') }, 1000)
 
       // Voortgang opslaan
       if (onProgressUpdate) {
@@ -326,6 +337,13 @@ function App({ profile = null, savedProgress = null, onProgressUpdate = null, on
         }, 1200)
       }
     }
+  }
+
+  const handleSamiPress = () => {
+    stopAll()
+    speakItem('uitleg-woorden', 'Luister goed welk woord je hoort! Tik daarna op het juiste woord!')
+    setSamiState('happy')
+    setTimeout(() => setSamiState('idle'), 2000)
   }
 
   const handleBackgroundTap = (e) => {
@@ -514,6 +532,16 @@ function App({ profile = null, savedProgress = null, onProgressUpdate = null, on
         <span className="text-white/40 text-xs" style={{ fontFamily: 'OpenDyslexic, sans-serif' }}>
           tik hier om het woord te herhalen
         </span>
+      </div>
+
+      {/* Sami rechtsonder — klikbaar voor uitleg */}
+      <div
+        style={{ position: 'fixed', bottom: 16, right: 16, cursor: 'pointer', textAlign: 'center' }}
+        onClick={handleSamiPress}
+        title="Tik op Sami voor uitleg"
+      >
+        <Salamander state={samiState} size="sm" />
+        <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.65rem', marginTop: 2, fontFamily: 'OpenDyslexic, sans-serif' }}>❓ uitleg</div>
       </div>
     </div>
   )

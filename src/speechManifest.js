@@ -213,6 +213,50 @@ export const SPEECH_ITEMS = [
   { id: 'sami-bijna',   text: 'Bijna! Nog één keer!',                   category: 'Sami', usedIn: 'Negatieve feedback' },
   { id: 'sami-ster',    text: 'Je hebt een ster verdiend!',             category: 'Sami', usedIn: 'Ster verdienen' },
 
+  // ---- Uitleg per spel (klikbaar via Sami) ----
+  {
+    id: 'uitleg-woorden',
+    text: 'Luister goed welk woord je hoort! Tik daarna op het juiste woord. Als je het woord wilt herhalen, tik je op de achtergrond!',
+    category: 'Uitleg',
+    usedIn: 'Module 1 — uitleg via Sami',
+  },
+  {
+    id: 'uitleg-klanken',
+    text: 'Luister naar de klank! Welke letter hoort daarbij? Tik op de goede letter!',
+    category: 'Uitleg',
+    usedIn: 'Module 2 — uitleg via Sami',
+  },
+  {
+    id: 'uitleg-rijmen',
+    text: 'Welk woord rijmt? Twee woorden rijmen als ze op hetzelfde klinken, zoals muis en huis! Tik op het plaatje dat rijmt!',
+    category: 'Uitleg',
+    usedIn: 'Module 3 — uitleg via Sami',
+  },
+  {
+    id: 'uitleg-patroon',
+    text: 'Kijk welke vakjes oplichten! Onthoud ze goed en tik ze daarna zelf aan!',
+    category: 'Uitleg',
+    usedIn: 'Module 4 — uitleg via Sami',
+  },
+  {
+    id: 'uitleg-reeks',
+    text: 'Kijk welke kleuren oplichten! Onthoud de volgorde en doe de reeks daarna zelf na!',
+    category: 'Uitleg',
+    usedIn: 'Module 5 — uitleg via Sami',
+  },
+  {
+    id: 'uitleg-klok',
+    text: 'Kijk goed naar de klok! De kleine wijzer wijst de uren, de grote wijzer wijst de minuten. Kies de juiste tijd!',
+    category: 'Uitleg',
+    usedIn: 'Module 6 — uitleg via Sami',
+  },
+  {
+    id: 'uitleg-rekenen',
+    text: 'Luister naar de som! Hoeveel is het antwoord? Tik op het juiste getal!',
+    category: 'Uitleg',
+    usedIn: 'Module 7 — uitleg via Sami',
+  },
+
   // ---- Module 4: Patroon herkennen ----
   { id: 'patroon-intro', text: 'Onthoud de gekleurde vakjes!',              category: 'Patroon', usedIn: 'Start ronde' },
   { id: 'patroon-klaar', text: 'Welke vakjes waren gekleurd?',              category: 'Patroon', usedIn: 'Na verbergen' },
