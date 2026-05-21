@@ -46,13 +46,14 @@ export default function HomeScreen({ profile, progressMap, onSelectModule, onBac
   return (
     <div
       style={{
-        minHeight: '100%',
+        height: '100%',
         background: '#FFFBF0',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         padding: '1rem',
         overflowY: 'auto',
+        WebkitOverflowScrolling: 'touch',
         paddingBottom: '2rem',
       }}
     >
