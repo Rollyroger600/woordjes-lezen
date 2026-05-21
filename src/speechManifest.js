@@ -272,14 +272,14 @@ export const SPEECH_ITEMS = [
   { id: 'reeks-nieuw',  text: 'Er komt een nieuwe kleur bij!',              category: 'Reeks', usedIn: 'Nieuwe kleur' },
 
   // ---- Module 6: Klokkijken ----
-  { id: 'klok-intro',        text: 'Leren klokkijken!',                          category: 'Klok', usedIn: 'Intro' },
-  { id: 'klok-uitleg-groot', text: 'De grote wijzer wijst de minuten',            category: 'Klok', usedIn: 'Uitleg scherm' },
-  { id: 'klok-uitleg-klein', text: 'De kleine wijzer wijst de uren',              category: 'Klok', usedIn: 'Uitleg scherm' },
-  { id: 'klok-vraag',        text: 'Hoe laat is het?',                            category: 'Klok', usedIn: 'Per vraag' },
-  { id: 'klok-heel',         text: 'Hele uren',                                   category: 'Klok', usedIn: 'Fase 1 intro' },
-  { id: 'klok-half',         text: 'Nu leren we ook de halve uren!',              category: 'Klok', usedIn: 'Fase 2 intro' },
-  { id: 'klok-goed',         text: 'Dat klopt!',                                  category: 'Klok', usedIn: 'Goed antwoord' },
-  { id: 'klok-fout',         text: 'Dat klopt niet, probeer het nog eens!',       category: 'Klok', usedIn: 'Fout antwoord' },
+  { id: 'klok-intro-1',      text: 'Kijk, dit is een klok! Op de klok staan de cijfers 1 tot 12.',                                             category: 'Klok', usedIn: 'Intro stap 1' },
+  { id: 'klok-intro-klein',  text: 'De kleine dikke rode wijzer wijst de uren. Hij wijst naar 3. Het is 3 uur!',                               category: 'Klok', usedIn: 'Intro stap 2' },
+  { id: 'klok-intro-groot',  text: 'De grote dunne blauwe wijzer wijst de minuten. Bij hele uren staat hij altijd op de 12.',                  category: 'Klok', usedIn: 'Intro stap 3' },
+  { id: 'klok-intro-oefen',  text: 'Kijk naar de kleine wijzer. Hij wijst naar 7. De grote wijzer staat op de 12. Het is 7 uur!',              category: 'Klok', usedIn: 'Intro stap 4' },
+  { id: 'klok-vraag',        text: 'Hoe laat is het?',                                                                                         category: 'Klok', usedIn: 'Per vraag' },
+  { id: 'klok-half',         text: 'Nu leren we ook de halve uren!',                                                                           category: 'Klok', usedIn: 'Fase 3 intro' },
+  { id: 'klok-goed',         text: 'Dat klopt!',                                                                                               category: 'Klok', usedIn: 'Goed antwoord' },
+  { id: 'klok-fout',         text: 'Dat klopt niet, probeer het nog eens!',                                                                    category: 'Klok', usedIn: 'Fout antwoord' },
 
   // ---- Module 7: Rekenen ----
   { id: 'rekenen-intro', text: 'Leren optellen en aftrekken!',                    category: 'Rekenen', usedIn: 'Start' },

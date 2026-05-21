@@ -1,8 +1,7 @@
 // ============================================================
 // KlokGame.jsx — Module 6: Klokkijken
-// Analoge SVG klok → kind kiest uit 3 tijdopties.
-// Fase 1: alleen hele uren; Fase 2: hele + halve uren.
-// Eenmalig uitlegscherm (clock_intro_seen in progress).
+// Uitgebreide 4-staps intro + mini-klokken als antwoorden
+// Fase 1: uren 1-6 | Fase 2: uren 1-12 | Fase 3: halve uren
 // ============================================================
 
 import { useState, useEffect, useRef, useCallback } from 'react'
@@ -13,17 +12,26 @@ import { debugLog } from './debugLogger'
 
 const font = { fontFamily: 'OpenDyslexic, sans-serif' }
 
-// ---- SVG Klok component ----
-function AnalogClock({ hour, minute, size = 220, animateIntro = false }) {
-  const cx = size / 2, cy = size / 2, r = size / 2 - 8
+const PHASE_LABELS = {
+  1: 'Uren 1–6',
+  2: 'Alle uren',
+  3: 'Halve uren',
+}
 
-  // Wijzer-hoeken (graden, 0 = boven)
-  const hourAngle  = ((hour % 12) + minute / 60) * 30 - 90  // 30° per uur
-  const minuteAngle = minute * 6 - 90                         // 6° per minuut
+// Juist getal correct antwoorden (niet op rij) om naar volgende fase te gaan
+const PHASE_THRESHOLD = { 1: 8, 2: 10, 3: Infinity }
+
+// ---- SVG Klok ----
+// glowHour / glowMinute: markeer de betreffende wijzer met kleur en dikte
+function AnalogClock({ hour, minute, size = 220, glowHour = false, glowMinute = false }) {
+  const cx = size / 2, cy = size / 2
+  const r  = size / 2 - Math.max(4, size * 0.025)
 
   const toRad = (deg) => (deg * Math.PI) / 180
 
-  // Eindpunten wijzers
+  const hourAngle   = ((hour % 12) + minute / 60) * 30 - 90
+  const minuteAngle = minute * 6 - 90
+
   const hourLen   = r * 0.55
   const minuteLen = r * 0.8
 
@@ -32,164 +40,261 @@ function AnalogClock({ hour, minute, size = 220, animateIntro = false }) {
   const minuteX = cx + minuteLen * Math.cos(toRad(minuteAngle))
   const minuteY = cy + minuteLen * Math.sin(toRad(minuteAngle))
 
-  // Uur-cijfers op de klok
   const numbers = Array.from({ length: 12 }, (_, i) => {
     const n = i + 1
     const angle = n * 30 - 90
     const nr = r * 0.82
-    return {
-      n,
-      x: cx + nr * Math.cos(toRad(angle)),
-      y: cy + nr * Math.sin(toRad(angle)),
-    }
+    return { n, x: cx + nr * Math.cos(toRad(angle)), y: cy + nr * Math.sin(toRad(angle)) }
   })
+
+  const tickStroke = Math.max(0.5, size * 0.006)
+  const thickStroke = Math.max(1.5, size * 0.012)
 
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-      {/* Klok-gezicht */}
-      <circle cx={cx} cy={cy} r={r} fill="#FFF9E6" stroke="#C4550F" strokeWidth={4} />
-      {/* Minuut-tikjes */}
+      <circle cx={cx} cy={cy} r={r} fill="#FFF9E6" stroke="#C4550F" strokeWidth={Math.max(2, size * 0.02)} />
+
       {Array.from({ length: 60 }, (_, i) => {
         const angle = i * 6 - 90
-        const inner = r * (i % 5 === 0 ? 0.88 : 0.92)
+        const inner = r * (i % 5 === 0 ? 0.88 : 0.93)
         const outer = r * 0.97
         return (
           <line
             key={i}
-            x1={cx + inner * Math.cos(toRad(angle))}
-            y1={cy + inner * Math.sin(toRad(angle))}
-            x2={cx + outer * Math.cos(toRad(angle))}
-            y2={cy + outer * Math.sin(toRad(angle))}
+            x1={cx + inner * Math.cos(toRad(angle))} y1={cy + inner * Math.sin(toRad(angle))}
+            x2={cx + outer * Math.cos(toRad(angle))} y2={cy + outer * Math.sin(toRad(angle))}
             stroke={i % 5 === 0 ? '#8B4513' : '#CCC'}
-            strokeWidth={i % 5 === 0 ? 2.5 : 1}
+            strokeWidth={i % 5 === 0 ? thickStroke : tickStroke}
           />
         )
       })}
-      {/* Uur-nummers */}
+
       {numbers.map(({ n, x, y }) => (
-        <text
-          key={n}
-          x={x} y={y}
-          textAnchor="middle"
-          dominantBaseline="central"
-          fontSize={size * 0.075}
-          fontWeight="bold"
-          fill="#5D3A1A"
-          fontFamily="OpenDyslexic, sans-serif"
-        >
+        <text key={n} x={x} y={y} textAnchor="middle" dominantBaseline="central"
+          fontSize={Math.max(8, size * 0.075)} fontWeight="bold" fill="#5D3A1A"
+          fontFamily="OpenDyslexic, sans-serif">
           {n}
         </text>
       ))}
-      {/* Uurwijzer */}
+
+      {/* Minuutwijzer (groot, dun — blauw als gemarkeerd) */}
       <line
-        x1={cx} y1={cy}
-        x2={hourX} y2={hourY}
-        stroke="#3E2009"
-        strokeWidth={size * 0.038}
+        x1={cx} y1={cy} x2={minuteX} y2={minuteY}
+        stroke={glowMinute ? '#1565C0' : '#C4550F'}
+        strokeWidth={glowMinute ? size * 0.038 : size * 0.022}
         strokeLinecap="round"
-        style={animateIntro ? { transition: 'x2 0.8s ease, y2 0.8s ease' } : {}}
+        style={{ transition: 'all 0.7s ease' }}
       />
-      {/* Minuutwijzer */}
+
+      {/* Uurwijzer (klein, dik — rood als gemarkeerd) */}
       <line
-        x1={cx} y1={cy}
-        x2={minuteX} y2={minuteY}
-        stroke="#C4550F"
-        strokeWidth={size * 0.025}
+        x1={cx} y1={cy} x2={hourX} y2={hourY}
+        stroke={glowHour ? '#C62828' : '#3E2009'}
+        strokeWidth={glowHour ? size * 0.065 : size * 0.04}
         strokeLinecap="round"
-        style={animateIntro ? { transition: 'x2 0.8s ease, y2 0.8s ease' } : {}}
+        style={{ transition: 'all 0.7s ease' }}
       />
-      {/* Middelpunt */}
-      <circle cx={cx} cy={cy} r={size * 0.04} fill="#C4550F" />
+
+      <circle cx={cx} cy={cy} r={Math.max(3, size * 0.04)} fill="#C4550F" />
     </svg>
   )
 }
 
-// ---- Uitleg-scherm ----
-function ClockIntroScreen({ onDone }) {
-  const [demoHour, setDemoHour] = useState(12)
-  const [demoMin, setDemoMin]   = useState(0)
-
-  useEffect(() => {
-    // Animeer naar 3 uur om de wijzers te demonstreren
-    stopAll()
-    const t1 = setTimeout(() => {
-      speakItem('klok-uitleg-groot', 'De grote wijzer wijst de minuten', {
-        onEnd: () => {
-          setDemoMin(0)
-          speakItem('klok-uitleg-klein', 'De kleine wijzer wijst de uren', {
-            onEnd: () => {
-              setDemoHour(3)
-            },
-          })
-        },
-      })
-    }, 600)
-    return () => { clearTimeout(t1); stopAll() }
-  }, [])
-
+// ---- Wijzer-hint strip (altijd zichtbaar tijdens spel) ----
+function WijzerHint() {
   return (
-    <div style={{
-      minHeight: '100%',
-      background: '#E0F2F1',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '1.5rem',
-    }}>
-      <p style={{ ...font, fontSize: '1.5rem', fontWeight: 'bold', color: '#00574B', marginBottom: '1rem' }}>
-        🕐 Klokkijken leren!
-      </p>
-
-      <AnalogClock hour={demoHour} minute={demoMin} size={200} animateIntro />
-
-      <div style={{
-        background: 'white',
-        borderRadius: '1.5rem',
-        padding: '1rem 1.5rem',
-        margin: '1.25rem 0',
-        maxWidth: 300,
-        textAlign: 'center',
-        boxShadow: '0 4px 15px rgba(0,0,0,0.08)',
-      }}>
-        <p style={{ ...font, color: '#5D3A1A', fontSize: '1rem', margin: '0 0 0.5rem' }}>
-          🔴 <strong>Kleine wijzer</strong> = uren
-        </p>
-        <p style={{ ...font, color: '#5D3A1A', fontSize: '1rem', margin: 0 }}>
-          🟠 <strong>Grote wijzer</strong> = minuten
-        </p>
-      </div>
-
-      <button
-        onClick={onDone}
-        style={{
-          ...font,
-          background: '#00796B',
-          color: 'white',
-          border: 'none',
-          borderRadius: '2rem',
-          padding: '1rem 2.5rem',
-          fontSize: '1.1rem',
-          fontWeight: 'bold',
-          cursor: 'pointer',
-          boxShadow: '0 4px 15px rgba(0,121,107,0.4)',
-        }}
-        onMouseDown={e => { e.currentTarget.style.transform = 'scale(0.95)' }}
-        onMouseUp={e => { e.currentTarget.style.transform = 'scale(1)' }}
-        onTouchStart={e => { e.currentTarget.style.transform = 'scale(0.95)' }}
-        onTouchEnd={e => { e.currentTarget.style.transform = 'scale(1)' }}
-      >
-        Ik snap het! Oefenen →
-      </button>
+    <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', margin: '0.4rem 0' }}>
+      <span style={{ ...font, fontSize: '0.72rem', color: '#B71C1C', background: '#FFEBEE', borderRadius: '2rem', padding: '0.15rem 0.55rem' }}>
+        ● klein = uren
+      </span>
+      <span style={{ ...font, fontSize: '0.72rem', color: '#0D47A1', background: '#E3F2FD', borderRadius: '2rem', padding: '0.15rem 0.55rem' }}>
+        ● groot = minuten
+      </span>
     </div>
   )
 }
 
-// ---- Helpers voor tijden genereren ----
+// ---- Uitgebreide intro (4 stappen) ----
+const INTRO_STEPS = [
+  {
+    title: 'Dit is een klok! 🕐',
+    hour: 12, minute: 0,
+    glowHour: false, glowMinute: false,
+    text: 'Met een klok zie je hoe laat het is. Op de klok staan de cijfers 1 tot 12.',
+    speechId: 'klok-intro-1',
+    speechText: 'Kijk, dit is een klok! Op de klok staan de cijfers 1 tot 12.',
+  },
+  {
+    title: '🔴 De kleine wijzer',
+    hour: 3, minute: 0,
+    glowHour: true, glowMinute: false,
+    text: 'De kleine dikke rode wijzer wijst de uren. Kijk, hij wijst naar 3. Het is 3 uur!',
+    speechId: 'klok-intro-klein',
+    speechText: 'De kleine dikke rode wijzer wijst de uren. Hij wijst naar 3. Het is 3 uur!',
+    badge: { color: '#C62828', bg: '#FFEBEE', text: '🔴  kleine wijzer = uren' },
+  },
+  {
+    title: '🔵 De grote wijzer',
+    hour: 9, minute: 0,
+    glowHour: false, glowMinute: true,
+    text: 'De grote dunne blauwe wijzer wijst de minuten. Bij hele uren staat hij altijd op de 12!',
+    speechId: 'klok-intro-groot',
+    speechText: 'De grote dunne blauwe wijzer wijst de minuten. Bij hele uren staat hij altijd op de 12.',
+    badge: { color: '#0D47A1', bg: '#E3F2FD', text: '🔵  grote wijzer = minuten' },
+  },
+  {
+    title: 'Hoe lees je de klok?',
+    hour: 7, minute: 0,
+    glowHour: false, glowMinute: false,
+    text: 'Kijk naar de kleine wijzer. Hij wijst naar 7. De grote wijzer staat op 12. Het is 7 uur!',
+    speechId: 'klok-intro-oefen',
+    speechText: 'Kijk naar de kleine wijzer. Hij wijst naar 7. De grote wijzer staat op de 12. Het is 7 uur!',
+    badge: { color: '#2E7D32', bg: '#E8F5E9', text: '✅  kleine wijzer → dat uur is het!' },
+    isLast: true,
+  },
+]
+
+function ClockIntroScreen({ onDone }) {
+  const [step, setStep] = useState(0)
+  const current = INTRO_STEPS[step]
+
+  useEffect(() => {
+    stopAll()
+    const t = setTimeout(() => {
+      speakItem(current.speechId, current.speechText)
+    }, 300)
+    return () => { clearTimeout(t); stopAll() }
+  }, [step]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const goNext = () => {
+    if (current.isLast) { stopAll(); onDone() }
+    else setStep(s => s + 1)
+  }
+
+  return (
+    <div style={{
+      height: '100%',
+      background: '#E0F2F1',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      padding: '1rem 1.25rem',
+      overflowY: 'auto',
+      WebkitOverflowScrolling: 'touch',
+    }}>
+      {/* Voortgang + overslaan */}
+      <div style={{ width: '100%', maxWidth: 360, display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {INTRO_STEPS.map((_, i) => (
+            <div key={i} style={{
+              width: 10, height: 10, borderRadius: '50%',
+              background: i <= step ? '#00796B' : '#B2DFDB',
+              transition: 'background 0.3s',
+            }} />
+          ))}
+        </div>
+        <button
+          onClick={() => { stopAll(); onDone() }}
+          style={{ ...font, background: 'transparent', border: 'none', color: '#80CBC4', fontSize: '0.85rem', cursor: 'pointer' }}
+        >
+          Overslaan →
+        </button>
+      </div>
+
+      {/* Titel */}
+      <p style={{ ...font, fontSize: '1.3rem', fontWeight: 'bold', color: '#00574B', margin: '0 0 0.75rem', textAlign: 'center' }}>
+        {current.title}
+      </p>
+
+      {/* Klok */}
+      <AnalogClock
+        hour={current.hour}
+        minute={current.minute}
+        size={190}
+        glowHour={current.glowHour}
+        glowMinute={current.glowMinute}
+      />
+
+      {/* Badge */}
+      {current.badge && (
+        <div style={{
+          marginTop: '0.6rem',
+          background: current.badge.bg,
+          border: `2px solid ${current.badge.color}`,
+          borderRadius: '1.5rem',
+          padding: '0.4rem 1rem',
+        }}>
+          <span style={{ ...font, fontSize: '0.9rem', color: current.badge.color, fontWeight: 'bold' }}>
+            {current.badge.text}
+          </span>
+        </div>
+      )}
+
+      {/* Uitleg tekst */}
+      <div style={{
+        background: 'white',
+        borderRadius: '1.5rem',
+        padding: '0.9rem 1.25rem',
+        margin: '0.75rem 0',
+        maxWidth: 340,
+        textAlign: 'center',
+        boxShadow: '0 3px 12px rgba(0,0,0,0.08)',
+      }}>
+        <p style={{ ...font, color: '#5D3A1A', fontSize: '0.95rem', margin: 0, lineHeight: 1.5 }}>
+          {current.text}
+        </p>
+      </div>
+
+      {/* Navigatie knoppen */}
+      <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.25rem' }}>
+        {step > 0 && (
+          <button
+            onClick={() => setStep(s => s - 1)}
+            style={{
+              ...font,
+              background: 'white',
+              border: '2px solid #B2DFDB',
+              borderRadius: '2rem',
+              padding: '0.8rem 1.5rem',
+              fontSize: '1rem',
+              color: '#00574B',
+              cursor: 'pointer',
+            }}
+          >
+            ← Terug
+          </button>
+        )}
+        <button
+          onClick={goNext}
+          style={{
+            ...font,
+            background: '#00796B',
+            border: 'none',
+            borderRadius: '2rem',
+            padding: '0.8rem 2rem',
+            fontSize: '1rem',
+            fontWeight: 'bold',
+            color: 'white',
+            cursor: 'pointer',
+            boxShadow: '0 4px 15px rgba(0,121,107,0.35)',
+          }}
+          onMouseDown={e => { e.currentTarget.style.transform = 'scale(0.95)' }}
+          onMouseUp={e => { e.currentTarget.style.transform = 'scale(1)' }}
+          onTouchStart={e => { e.currentTarget.style.transform = 'scale(0.95)' }}
+          onTouchEnd={e => { e.currentTarget.style.transform = 'scale(1)' }}
+        >
+          {current.isLast ? 'Oefenen! →' : 'Volgende →'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ---- Tijden genereren ----
 function generateTime(phase) {
-  // Fase 1: alleen hele uren; Fase 2: hele + halve uren
-  const hour = Math.floor(Math.random() * 12) + 1
-  const minute = phase === 1 ? 0 : (Math.random() < 0.5 ? 0 : 30)
+  const maxHour = phase === 1 ? 6 : 12
+  const hour = Math.floor(Math.random() * maxHour) + 1
+  const minute = phase >= 3 ? (Math.random() < 0.5 ? 0 : 30) : 0
   return { hour, minute }
 }
 
@@ -198,19 +303,17 @@ function timeLabel(hour, minute) {
   return `half ${hour + 1 > 12 ? 1 : hour + 1}`
 }
 
-function generateOptions(correct) {
+function generateOptions(correct, phase) {
+  const maxHour = phase === 1 ? 6 : 12
   const opts = [correct]
   let attempts = 0
-  while (opts.length < 3 && attempts < 50) {
+  while (opts.length < 3 && attempts < 60) {
     attempts++
-    const h = Math.floor(Math.random() * 12) + 1
-    const m = correct.minute === 30 ? (Math.random() < 0.5 ? 0 : 30) : 0
-    const lbl = timeLabel(h, m)
-    if (lbl !== timeLabel(correct.hour, correct.minute) && !opts.some(o => timeLabel(o.hour, o.minute) === lbl)) {
-      opts.push({ hour: h, minute: m })
-    }
+    const h = Math.floor(Math.random() * maxHour) + 1
+    const m = phase >= 3 ? (Math.random() < 0.5 ? 0 : 30) : 0
+    const isDup = opts.some(o => o.hour === h && o.minute === m)
+    if (!isDup) opts.push({ hour: h, minute: m })
   }
-  // shuffle
   for (let i = opts.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [opts[i], opts[j]] = [opts[j], opts[i]]
@@ -218,59 +321,74 @@ function generateOptions(correct) {
   return opts
 }
 
-// ---- Hoofd-spel component ----
+// ---- Hoofd-spel ----
 export default function KlokGame({ savedProgress, onProgressUpdate, onBack }) {
   const introSeen = savedProgress?.clock_intro_seen ?? false
 
-  const [showIntro, setShowIntro]     = useState(!introSeen)
-  const [klokPhase, setKlokPhase]     = useState(() => savedProgress?.current_level ?? 1) // 1 of 2
-  const klokPhaseRef = useRef(klokPhase)
-  const [consecutiveCorrect, setConsecutiveCorrect] = useState(() => savedProgress?.consecutive_correct ?? 0)
-  const [totalStars, setTotalStars]   = useState(() => savedProgress?.total_stars ?? 0)
-  const [sessionStars, setSessionStars] = useState(0)
-  const [samiState, setSamiState]     = useState('idle')
+  const [showIntro, setShowIntro] = useState(!introSeen)
 
-  const [currentTime, setCurrentTime] = useState(null)
-  const [options, setOptions]         = useState([])
-  const [selectedOpt, setSelectedOpt] = useState(null)
-  const [answerResult, setAnswerResult] = useState(null) // null | 'correct' | 'wrong'
+  // words_visible = 3 → nieuw 3-fase schema. null/anders → oud schema (fase 1 of 2).
+  const [phase, setPhase] = useState(() => {
+    const saved = savedProgress?.current_level ?? 1
+    const isOldScheme = !savedProgress || (savedProgress.words_visible ?? 0) < 3
+    if (isOldScheme) {
+      // Oud: fase 1 (hele uren) → nieuw fase 2, oud fase 2 (halve uren) → nieuw fase 3
+      return Math.min(saved + 1, 3)
+    }
+    return Math.min(Math.max(saved, 1), 3)
+  })
+
+  const phaseRef = useRef(phase)
+  useEffect(() => { phaseRef.current = phase }, [phase])
+
+  // Bewaar hoeveel correct in huidige fase (voor fase-overgang, niet op rij)
+  const [phaseCorrect, setPhaseCorrect]     = useState(0)
+  const [consecutiveCorrect, setCC]         = useState(() => savedProgress?.consecutive_correct ?? 0)
+  const [totalStars, setTotalStars]         = useState(() => savedProgress?.total_stars ?? 0)
+  const [sessionStars, setSessionStars]     = useState(0)
+  const [samiState, setSamiState]           = useState('idle')
+
+  const [currentTime, setCurrentTime]       = useState(null)
+  const [options, setOptions]               = useState([])
+  const [selectedOpt, setSelectedOpt]       = useState(null)
+  const [answerResult, setAnswerResult]     = useState(null)
+  const [feedbackLabel, setFeedbackLabel]   = useState('')
   const lastTimeRef = useRef(null)
 
   const handleIntroDone = () => {
     stopAll()
     setShowIntro(false)
-    onProgressUpdate?.({ clock_intro_seen: true })
+    onProgressUpdate?.({ clock_intro_seen: true, words_visible: 3 })
   }
 
-  useEffect(() => { klokPhaseRef.current = klokPhase }, [klokPhase])
-
-  // ---- Genereer nieuwe vraag ----
   const nextQuestion = useCallback(() => {
-    const phase = klokPhaseRef.current
-    let time
-    let tries = 0
+    const p = phaseRef.current
+    let time, tries = 0
     do {
-      time = generateTime(phase)
+      time = generateTime(p)
       tries++
     } while (
       tries < 10 &&
       lastTimeRef.current &&
-      timeLabel(time.hour, time.minute) === timeLabel(lastTimeRef.current.hour, lastTimeRef.current.minute)
+      time.hour === lastTimeRef.current.hour &&
+      time.minute === lastTimeRef.current.minute
     )
     lastTimeRef.current = time
-    const opts = generateOptions(time)
-    debugLog('KlokGame vraag', `${timeLabel(time.hour, time.minute)} (fase ${klokPhaseRef.current})`)
+    const opts = generateOptions(time, p)
+    debugLog('KlokGame vraag', `${timeLabel(time.hour, time.minute)} (fase ${p})`)
+
     setCurrentTime(time)
     setOptions(opts)
     setSelectedOpt(null)
     setAnswerResult(null)
+    setFeedbackLabel('')
     setSamiState('thinking')
 
     setTimeout(() => {
       setSamiState('idle')
       speakItem('klok-vraag', 'Hoe laat is het?')
     }, 400)
-  }, []) // klokPhaseRef is een ref — stabiel, geen dep nodig
+  }, [])
 
   useEffect(() => {
     if (!showIntro) {
@@ -280,19 +398,17 @@ export default function KlokGame({ savedProgress, onProgressUpdate, onBack }) {
     return () => stopAll()
   }, [showIntro]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Introdueer halve uren
   const halfIntroShownRef = useRef(false)
   useEffect(() => {
-    if (klokPhase === 2 && !halfIntroShownRef.current) {
+    if (phase === 3 && !halfIntroShownRef.current) {
       halfIntroShownRef.current = true
       speakItem('klok-half', 'Nu leren we ook de halve uren!')
     }
-  }, [klokPhase])
+  }, [phase])
 
-  // ---- Uitleg herhalen via Sami ----
   const handleSamiPress = () => {
     stopAll()
-    speakItem('uitleg-klok', 'Kijk goed naar de klok! De kleine wijzer wijst de uren, de grote wijzer wijst de minuten. Kies de juiste tijd!')
+    speakItem('uitleg-klok', 'Kijk goed naar de klok! De kleine rode wijzer wijst de uren. De grote blauwe wijzer staat bij hele uren op de 12.')
     setSamiState('happy')
     setTimeout(() => setSamiState('idle'), 2000)
   }
@@ -303,21 +419,22 @@ export default function KlokGame({ savedProgress, onProgressUpdate, onBack }) {
     playClick()
     setSelectedOpt(opt)
 
-    const correctLabel = timeLabel(currentTime.hour, currentTime.minute)
-    const chosenLabel  = timeLabel(opt.hour, opt.minute)
+    const correct = opt.hour === currentTime.hour && opt.minute === currentTime.minute
 
-    if (chosenLabel === correctLabel) {
-      debugLog('KlokGame antwoord', `correct: ${chosenLabel}`)
+    if (correct) {
+      debugLog('KlokGame antwoord', `correct: ${timeLabel(opt.hour, opt.minute)}`)
       setSamiState('happy')
       setAnswerResult('correct')
-      const newCorrect = consecutiveCorrect + 1
-      setConsecutiveCorrect(newCorrect)
+
+      const newCC = consecutiveCorrect + 1
+      setCC(newCC)
+      const newPhaseCorrect = phaseCorrect + 1
+      setPhaseCorrect(newPhaseCorrect)
 
       let newStars = totalStars
-      let newPhase = klokPhase
+      let newPhase = phase
 
-      // Ster elke 5 goed
-      if (newCorrect % 5 === 0) {
+      if (newCC % 5 === 0) {
         newStars = totalStars + 1
         setTotalStars(newStars)
         setSessionStars(s => s + 1)
@@ -329,40 +446,46 @@ export default function KlokGame({ savedProgress, onProgressUpdate, onBack }) {
         playCorrect()
       }
 
-      // Naar fase 2 na 10x goed fase 1
-      if (klokPhase === 1 && newCorrect >= 10) {
-        newPhase = 2
-        setKlokPhase(2)
-        debugLog('Level', 'fase 1 → fase 2 (halve uren)')
+      // Fase omhoog?
+      const threshold = PHASE_THRESHOLD[phase]
+      if (newPhaseCorrect >= threshold && phase < 3) {
+        newPhase = phase + 1
+        setPhase(newPhase)
+        setPhaseCorrect(0)
+        debugLog('Level', `klok fase ${phase} → fase ${newPhase}`)
       }
 
+      setFeedbackLabel(`✓ Het is ${timeLabel(currentTime.hour, currentTime.minute)}!`)
       speakItem('klok-goed', 'Dat klopt!')
       onProgressUpdate?.({
         current_level: newPhase,
         total_stars: newStars,
-        consecutive_correct: newCorrect,
+        consecutive_correct: newCC,
         consecutive_wrong: 0,
         clock_intro_seen: true,
+        words_visible: 3,
       })
+      setTimeout(() => { setSamiState('idle'); nextQuestion() }, 1500)
 
-      setTimeout(() => { setSamiState('idle'); nextQuestion() }, 1400)
     } else {
-      debugLog('KlokGame antwoord', `fout: gekozen ${chosenLabel}, correct: ${correctLabel}`)
+      debugLog('KlokGame antwoord', `fout: ${timeLabel(opt.hour, opt.minute)}, correct: ${timeLabel(currentTime.hour, currentTime.minute)}`)
       setSamiState('sad')
       setAnswerResult('wrong')
       playWrong()
-      setConsecutiveCorrect(0)
+      setCC(0)
+      setPhaseCorrect(Math.max(0, phaseCorrect - 1))
 
+      setFeedbackLabel(`Het is ${timeLabel(currentTime.hour, currentTime.minute)}`)
       speakItem('klok-fout', 'Dat klopt niet, probeer het nog eens!')
       onProgressUpdate?.({
-        current_level: klokPhase,
+        current_level: phase,
         total_stars: totalStars,
         consecutive_correct: 0,
         consecutive_wrong: 1,
         clock_intro_seen: true,
+        words_visible: 3,
       })
-
-      setTimeout(() => { setSamiState('idle'); nextQuestion() }, 1800)
+      setTimeout(() => { setSamiState('idle'); nextQuestion() }, 2000)
     }
   }
 
@@ -372,49 +495,68 @@ export default function KlokGame({ savedProgress, onProgressUpdate, onBack }) {
 
   return (
     <div style={{
-      minHeight: '100%',
+      height: '100%',
       background: '#E0F2F1',
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
-      padding: '1rem',
+      padding: '0.75rem 1rem',
+      overflowY: 'auto',
+      WebkitOverflowScrolling: 'touch',
       userSelect: 'none',
     }}>
       {/* Header */}
-      <div style={{ width: '100%', maxWidth: 400, display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+      <div style={{ width: '100%', maxWidth: 400, display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
         <button
           onClick={() => { stopAll(); onBack() }}
           style={{ background: 'rgba(0,0,0,0.08)', border: 'none', borderRadius: '1rem', padding: '0.4rem 0.9rem', cursor: 'pointer', ...font, color: '#555' }}
         >
           ← Terug
         </button>
-        <span style={{ ...font, fontSize: '0.9rem', color: '#00574B' }}>
-          {klokPhase === 1 ? 'Hele uren 🕐' : 'Hele + halve uren 🕧'}
+        <span style={{ ...font, fontSize: '0.85rem', color: '#00574B', fontWeight: 'bold' }}>
+          {PHASE_LABELS[phase]}
         </span>
         <span style={{ ...font, fontSize: '1rem', color: '#00574B' }}>⭐ {sessionStars}</span>
       </div>
 
       {/* Vraag */}
-      <p style={{ ...font, fontSize: '1.2rem', color: '#00574B', fontWeight: 'bold', margin: '0.5rem 0 1rem' }}>
+      <p style={{ ...font, fontSize: '1.2rem', color: '#00574B', fontWeight: 'bold', margin: '0.25rem 0' }}>
         Hoe laat is het?
       </p>
 
-      {/* Klok */}
+      {/* Grote klok */}
       {currentTime && (
-        <AnalogClock hour={currentTime.hour} minute={currentTime.minute} size={220} />
+        <AnalogClock hour={currentTime.hour} minute={currentTime.minute} size={200} />
       )}
 
-      {/* Antwoord-opties */}
-      <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem', flexWrap: 'wrap', justifyContent: 'center' }}>
-        {options.map((opt, i) => {
-          const label = timeLabel(opt.hour, opt.minute)
-          const isCorrect = currentTime && timeLabel(currentTime.hour, currentTime.minute) === label
-          const isSelected = selectedOpt && timeLabel(selectedOpt.hour, selectedOpt.minute) === label
+      {/* Wijzer-hint */}
+      <WijzerHint />
 
+      {/* Feedback label */}
+      <div style={{ height: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {feedbackLabel && (
+          <span style={{
+            ...font,
+            fontSize: '1rem',
+            fontWeight: 'bold',
+            color: answerResult === 'correct' ? '#2E7D32' : '#B71C1C',
+          }}>
+            {feedbackLabel}
+          </span>
+        )}
+      </div>
+
+      {/* Mini-klok antwoord knoppen */}
+      <div style={{ display: 'flex', gap: '0.6rem', marginTop: '0.25rem', flexWrap: 'wrap', justifyContent: 'center', paddingBottom: '4rem' }}>
+        {options.map((opt, i) => {
+          const isCorrect  = currentTime && opt.hour === currentTime.hour && opt.minute === currentTime.minute
+          const isSelected = selectedOpt  && selectedOpt.hour === opt.hour  && selectedOpt.minute === opt.minute
+
+          let border = '3px solid #B2DFDB'
           let bg = 'white'
-          let border = '2px solid #B2DFDB'
-          if (answerResult && isCorrect) { bg = '#C8E6C9'; border = '2px solid #4CAF50' }
-          else if (answerResult && isSelected && !isCorrect) { bg = '#FFCDD2'; border = '2px solid #F44336' }
+          let shadow = '0 3px 10px rgba(0,0,0,0.08)'
+          if (answerResult && isCorrect)               { bg = '#E8F5E9'; border = '3px solid #4CAF50'; shadow = '0 0 0 4px #A5D6A7' }
+          else if (answerResult && isSelected && !isCorrect) { bg = '#FFEBEE'; border = '3px solid #F44336' }
 
           return (
             <button
@@ -422,35 +564,32 @@ export default function KlokGame({ savedProgress, onProgressUpdate, onBack }) {
               onClick={() => handleAnswer(opt)}
               disabled={!!answerResult}
               style={{
-                ...font,
-                width: 110,
-                minHeight: 80,
                 background: bg,
                 border,
                 borderRadius: '1.25rem',
-                fontSize: '1.1rem',
-                fontWeight: 'bold',
-                color: '#00574B',
+                padding: '0.4rem',
                 cursor: answerResult ? 'default' : 'pointer',
-                boxShadow: '0 3px 10px rgba(0,0,0,0.08)',
-                transition: 'transform 0.1s',
+                boxShadow: shadow,
+                transition: 'transform 0.1s, box-shadow 0.1s',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
               }}
-              onMouseDown={e => { if (!answerResult) e.currentTarget.style.transform = 'scale(0.95)' }}
+              onMouseDown={e => { if (!answerResult) e.currentTarget.style.transform = 'scale(0.93)' }}
               onMouseUp={e => { e.currentTarget.style.transform = 'scale(1)' }}
-              onTouchStart={e => { if (!answerResult) e.currentTarget.style.transform = 'scale(0.95)' }}
+              onTouchStart={e => { if (!answerResult) e.currentTarget.style.transform = 'scale(0.93)' }}
               onTouchEnd={e => { e.currentTarget.style.transform = 'scale(1)' }}
             >
-              {label}
+              <AnalogClock hour={opt.hour} minute={opt.minute} size={95} />
             </button>
           )
         })}
       </div>
 
-      {/* Sami rechtsonder — klikbaar voor uitleg */}
+      {/* Sami rechtsonder */}
       <div
         style={{ position: 'fixed', bottom: 16, right: 16, cursor: 'pointer', textAlign: 'center' }}
         onClick={handleSamiPress}
-        title="Tik op Sami voor uitleg"
       >
         <Salamander state={samiState} size="sm" />
         <div style={{ color: '#555', fontSize: '0.65rem', marginTop: 2, ...font }}>❓ uitleg</div>
