@@ -106,7 +106,14 @@ function speakSum(a, b, op) {
 }
 
 export default function RekenGame({ savedProgress, onProgressUpdate, onBack }) {
-  const [level, setLevel]               = useState(() => Math.min(savedProgress?.current_level ?? 0, LEVELS.length - 1))
+  // words_visible wordt hergebruikt als versie-markering voor het level-schema.
+  // null/0 = oud schema (7 levels, 0-6) → schuif +2 op voor de 2 nieuwe visuele levels.
+  // 2 = nieuw schema (9 levels) → gebruik level zoals opgeslagen.
+  const [level, setLevel]               = useState(() => {
+    const saved = savedProgress?.current_level ?? 0
+    const isOldScheme = savedProgress && (savedProgress.words_visible ?? 0) < 2
+    return Math.min(isOldScheme ? saved + 2 : saved, LEVELS.length - 1)
+  })
   const [consecutiveCorrect, setCC]     = useState(() => savedProgress?.consecutive_correct ?? 0)
   const [consecutiveWrong, setCW]       = useState(() => savedProgress?.consecutive_wrong ?? 0)
   const [totalStars, setTotalStars]     = useState(() => savedProgress?.total_stars ?? 0)
@@ -206,6 +213,7 @@ export default function RekenGame({ savedProgress, onProgressUpdate, onBack }) {
         total_stars: newStars,
         consecutive_correct: newCC >= 5 ? 0 : newCC,
         consecutive_wrong: 0,
+        words_visible: 2,
       })
       setTimeout(() => { setSamiState('idle'); nextQuestion() }, 1400)
 
@@ -233,6 +241,7 @@ export default function RekenGame({ savedProgress, onProgressUpdate, onBack }) {
         total_stars: totalStars,
         consecutive_correct: 0,
         consecutive_wrong: newCW,
+        words_visible: 2,
       })
       setTimeout(() => { setSamiState('idle'); nextQuestion() }, 1800)
     }
