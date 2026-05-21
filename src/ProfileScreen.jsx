@@ -64,6 +64,7 @@ export default function ProfileScreen({ onSelect }) {
   const [newName, setNewName] = useState('')
   const [newAvatar, setNewAvatar] = useState(AVATARS[0])
   const [newPin, setNewPin] = useState('')
+  const [createError, setCreateError] = useState('')
   const longPressRef = useRef(null)
   const vibrationRef = useRef(null)
 
@@ -142,18 +143,27 @@ export default function ProfileScreen({ onSelect }) {
   // ---- Create ----
   async function handleCreateProfile() {
     setSaving(true)
+    setCreateError('')
     try {
       const color = COLORS[profiles.length % COLORS.length]
       const hash = await bcrypt.hash(newPin, 6)
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('profiles')
         .insert({ child_name: newName.trim(), avatar: newAvatar, color, pin_hash: hash })
         .select()
         .single()
+      if (error) {
+        console.error('Supabase insert fout:', error)
+        setCreateError(`Fout: ${error.message}`)
+        return
+      }
       if (data) {
         localStorage.setItem('lastProfileId', data.id)
         onSelect(data)
       }
+    } catch (err) {
+      console.error('Onverwachte fout:', err)
+      setCreateError('Er ging iets mis. Probeer opnieuw.')
     } finally {
       setSaving(false)
     }
@@ -345,6 +355,9 @@ export default function ProfileScreen({ onSelect }) {
             onDigit={d => setNewPin(p => p.length < 3 ? p + d : p)}
             onDelete={() => setNewPin(p => p.slice(0, -1))}
           />
+          {createError && (
+            <p className="text-red-500 text-xs mt-4" style={font}>{createError}</p>
+          )}
           <div className="flex gap-3 mt-6">
             <button
               onClick={() => setScreen('create-avatar')}
