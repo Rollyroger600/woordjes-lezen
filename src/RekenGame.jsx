@@ -1,7 +1,7 @@
 // ============================================================
 // RekenGame.jsx — Module 7: Optellen & Aftrekken
-// Sommen worden uitgesproken + getoond. Kind kiest uit 3 opties.
-// 7 levels: optellen/aftrekken tot 5/10/20 + mix.
+// Level 0-1: visueel tellen met emoji-plaatjes
+// Level 2-8: abstracte sommen met cijfers
 // ============================================================
 
 import { useState, useEffect, useCallback } from 'react'
@@ -12,9 +12,11 @@ import { debugLog } from './debugLogger'
 
 const font = { fontFamily: 'OpenDyslexic, sans-serif' }
 
-// ---- Level definities ----
-// [operator, maxGetal]  — 'plus' | 'min' | 'mix'
+// visual:'full'  → emoji-plaatjes als vraag én als antwoord-opties
+// visual:'half'  → emoji-plaatjes als vraag, cijfers als antwoord-opties
 const LEVELS = [
+  { op: 'plus', max: 5,  label: 'Tellen met plaatjes',   visual: 'full' },
+  { op: 'plus', max: 5,  label: 'Plaatjes en cijfers',   visual: 'half' },
   { op: 'plus', max: 5,  label: 'Optellen tot 5' },
   { op: 'plus', max: 10, label: 'Optellen tot 10' },
   { op: 'min',  max: 5,  label: 'Aftrekken tot 5' },
@@ -23,6 +25,31 @@ const LEVELS = [
   { op: 'min',  max: 20, label: 'Aftrekken tot 20' },
   { op: 'mix',  max: 20, label: 'Optellen én aftrekken tot 20' },
 ]
+
+const VISUAL_EMOJIS = ['🍎', '🍋', '🍊', '🍓', '🍇', '🐸', '🐱', '🐶', '🐰', '⭐', '🌟', '💫']
+
+function pickEmoji() {
+  return VISUAL_EMOJIS[Math.floor(Math.random() * VISUAL_EMOJIS.length)]
+}
+
+// Toont N emojis in rijen van max 5
+function EmojiGroup({ count, emoji }) {
+  const rows = []
+  for (let i = 0; i < count; i += 5) {
+    rows.push(Math.min(5, count - i))
+  }
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'center' }}>
+      {rows.map((rowCount, ri) => (
+        <div key={ri} style={{ display: 'flex', gap: 3 }}>
+          {Array.from({ length: rowCount }, (_, j) => (
+            <span key={j} style={{ fontSize: '1.5rem', lineHeight: 1 }}>{emoji}</span>
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+}
 
 function pickOp(levelDef) {
   if (levelDef.op === 'mix') return Math.random() < 0.5 ? 'plus' : 'min'
@@ -33,12 +60,10 @@ function generateSum(levelDef) {
   const op = pickOp(levelDef)
   const max = levelDef.max
   if (op === 'plus') {
-    // a en b minimaal 1, zodat 0 nooit voorkomt
     const a = Math.floor(Math.random() * (max - 1)) + 1
     const b = Math.floor(Math.random() * (max - a)) + 1
     return { a, b, op, answer: a + b }
   } else {
-    // Aftrekken: b minimaal 1, antwoord minimaal 1 (zodat ook a > b altijd geldt)
     const answer = Math.floor(Math.random() * (max - 1)) + 1
     const b = Math.floor(Math.random() * (max - answer)) + 1
     const a = answer + b
@@ -46,19 +71,20 @@ function generateSum(levelDef) {
   }
 }
 
-function generateOptions(correct, max) {
+function generateOptions(correct, max, isVisual) {
   const opts = new Set([correct])
   let tries = 0
+  // Visueel: kleinere delta zodat het niet te veel emoji's worden
+  const maxDelta = isVisual ? 2 : 4
   while (opts.size < 3 && tries < 50) {
     tries++
-    const delta = Math.floor(Math.random() * 4) + 1
+    const delta = Math.floor(Math.random() * maxDelta) + 1
     const candidate = correct + (Math.random() < 0.5 ? delta : -delta)
-    if (candidate >= 1 && candidate <= max + 5 && candidate !== correct) {
+    if (candidate >= 1 && candidate <= max + (isVisual ? 3 : 5) && candidate !== correct) {
       opts.add(candidate)
     }
   }
   const arr = [...opts]
-  // Shuffle
   for (let i = arr.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [arr[i], arr[j]] = [arr[j], arr[i]]
@@ -66,72 +92,73 @@ function generateOptions(correct, max) {
   return arr
 }
 
-// Spreek een som uit via audio-bestanden + TTS fallback
 function speakSum(a, b, op) {
   stopAll()
-  // Keten: "Hoeveel is" + getal_a + operator + getal_b + "?"
-  // Gebruik TTS als fallback wanneer bestanden ontbreken
   const operatorId   = op === 'plus' ? 'rekenen-plus' : 'rekenen-min'
   const operatorText = op === 'plus' ? 'plus' : 'min'
-
   speakItem(`getal-${a}`, String(a), {
     onEnd: () => {
       speakItem(operatorId, operatorText, {
-        onEnd: () => {
-          speakItem(`getal-${b}`, String(b))
-        },
+        onEnd: () => speakItem(`getal-${b}`, String(b)),
       })
     },
   })
 }
 
 export default function RekenGame({ savedProgress, onProgressUpdate, onBack }) {
-  const [level, setLevel]                 = useState(() => Math.min(savedProgress?.current_level ?? 0, LEVELS.length - 1))
-  const [consecutiveCorrect, setCC]       = useState(() => savedProgress?.consecutive_correct ?? 0)
-  const [consecutiveWrong, setCW]         = useState(() => savedProgress?.consecutive_wrong ?? 0)
-  const [totalStars, setTotalStars]       = useState(() => savedProgress?.total_stars ?? 0)
-  const [sessionStars, setSessionStars]   = useState(0)
-  const [samiState, setSamiState]         = useState('idle')
-
-  const [currentSum, setCurrentSum]       = useState(null)
-  const [options, setOptions]             = useState([])
-  const [selectedOpt, setSelectedOpt]     = useState(null)
-  const [answerResult, setAnswerResult]   = useState(null) // null | 'correct' | 'wrong'
+  const [level, setLevel]               = useState(() => Math.min(savedProgress?.current_level ?? 0, LEVELS.length - 1))
+  const [consecutiveCorrect, setCC]     = useState(() => savedProgress?.consecutive_correct ?? 0)
+  const [consecutiveWrong, setCW]       = useState(() => savedProgress?.consecutive_wrong ?? 0)
+  const [totalStars, setTotalStars]     = useState(() => savedProgress?.total_stars ?? 0)
+  const [sessionStars, setSessionStars] = useState(0)
+  const [samiState, setSamiState]       = useState('idle')
+  const [currentSum, setCurrentSum]     = useState(null)
+  const [options, setOptions]           = useState([])
+  const [selectedOpt, setSelectedOpt]   = useState(null)
+  const [answerResult, setAnswerResult] = useState(null)
+  const [currentEmoji, setCurrentEmoji] = useState(() => pickEmoji())
 
   const levelDef = LEVELS[level]
+  const isVisual = !!levelDef.visual
 
-  // ---- Nieuwe vraag ----
   const nextQuestion = useCallback(() => {
     const sum = generateSum(levelDef)
-    const opts = generateOptions(sum.answer, levelDef.max)
+    const opts = generateOptions(sum.answer, levelDef.max, isVisual)
     debugLog('RekenGame som', `${sum.a} ${sum.op === 'plus' ? '+' : '-'} ${sum.b} = ${sum.answer} (${levelDef.label})`)
     setCurrentSum(sum)
     setOptions(opts)
     setSelectedOpt(null)
     setAnswerResult(null)
     setSamiState('thinking')
+    if (isVisual) setCurrentEmoji(pickEmoji())
 
     setTimeout(() => {
       setSamiState('idle')
-      // Eerst intro-tekst, dan de som zelf
-      speakItem('rekenen-intro', 'Hoeveel is...', {
-        onEnd: () => speakSum(sum.a, sum.b, sum.op),
-      })
+      if (isVisual) {
+        speakItem('rekenen-tellen', 'Hoeveel zijn het samen?')
+      } else {
+        speakItem('rekenen-intro', 'Hoeveel is...', {
+          onEnd: () => speakSum(sum.a, sum.b, sum.op),
+        })
+      }
     }, 400)
-  }, [levelDef])
+  }, [levelDef, isVisual])
 
   useEffect(() => {
     stopAll()
-    speakItem('rekenen-intro', 'Leren optellen en aftrekken!', {
+    speakItem('rekenen-start', 'Leren optellen en aftrekken!', {
       onEnd: () => nextQuestion(),
     })
     return () => stopAll()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ---- Uitleg herhalen via Sami ----
   const handleSamiPress = () => {
     stopAll()
-    speakItem('uitleg-rekenen', 'Luister naar de som! Hoeveel is het antwoord? Tik op het juiste getal!')
+    if (isVisual) {
+      speakItem('uitleg-tellen', 'Tel de plaatjes! Hoeveel zijn het samen? Tik op het goede antwoord!')
+    } else {
+      speakItem('uitleg-rekenen', 'Luister naar de som! Hoeveel is het antwoord? Tik op het juiste getal!')
+    }
     setSamiState('happy')
     setTimeout(() => setSamiState('idle'), 2000)
   }
@@ -154,7 +181,6 @@ export default function RekenGame({ savedProgress, onProgressUpdate, onBack }) {
       let newLevel = level
       let newStars = totalStars
 
-      // Level omhoog na 5x goed op rij
       if (newCC >= 5 && level < LEVELS.length - 1) {
         newLevel = level + 1
         setLevel(newLevel)
@@ -162,7 +188,6 @@ export default function RekenGame({ savedProgress, onProgressUpdate, onBack }) {
         debugLog('Level', `${LEVELS[level].label} → ${LEVELS[newLevel].label}`)
       }
 
-      // Ster elke 5 goede antwoorden
       if (newCC % 5 === 0) {
         newStars = totalStars + 1
         setTotalStars(newStars)
@@ -182,8 +207,8 @@ export default function RekenGame({ savedProgress, onProgressUpdate, onBack }) {
         consecutive_correct: newCC >= 5 ? 0 : newCC,
         consecutive_wrong: 0,
       })
-
       setTimeout(() => { setSamiState('idle'); nextQuestion() }, 1400)
+
     } else {
       debugLog('RekenGame antwoord', `fout: gekozen ${opt}, correct: ${currentSum.answer}`)
       setSamiState('sad')
@@ -209,7 +234,6 @@ export default function RekenGame({ savedProgress, onProgressUpdate, onBack }) {
         consecutive_correct: 0,
         consecutive_wrong: newCW,
       })
-
       setTimeout(() => { setSamiState('idle'); nextQuestion() }, 1800)
     }
   }
@@ -218,12 +242,14 @@ export default function RekenGame({ savedProgress, onProgressUpdate, onBack }) {
 
   return (
     <div style={{
-      minHeight: '100%',
+      height: '100%',
       background: '#FFF3E0',
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
       padding: '1rem',
+      overflowY: 'auto',
+      WebkitOverflowScrolling: 'touch',
       userSelect: 'none',
     }}>
       {/* Header */}
@@ -238,26 +264,47 @@ export default function RekenGame({ savedProgress, onProgressUpdate, onBack }) {
         <span style={{ ...font, fontSize: '1rem', color: '#E65100' }}>⭐ {sessionStars}</span>
       </div>
 
-      {/* Som weergave */}
+      {/* Vraag */}
       {currentSum && (
         <div style={{
           background: 'white',
           borderRadius: '2rem',
-          padding: '1.5rem 2.5rem',
-          margin: '1.5rem 0',
+          padding: '1.5rem 2rem',
+          margin: '1rem 0',
           boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-          textAlign: 'center',
+          width: '100%',
+          maxWidth: 380,
         }}>
-          <p style={{ ...font, fontSize: '3rem', fontWeight: 'bold', color: '#3E2009', margin: 0 }}>
-            {currentSum.a} {opSymbol} {currentSum.b} = ?
-          </p>
+          {isVisual ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.8rem', flexWrap: 'wrap' }}>
+              <div style={{ background: '#FFF8E1', borderRadius: '1rem', padding: '0.6rem 0.8rem' }}>
+                <EmojiGroup count={currentSum.a} emoji={currentEmoji} />
+              </div>
+              <span style={{ fontSize: '2rem', color: '#E65100', fontWeight: 'bold' }}>+</span>
+              <div style={{ background: '#FFF8E1', borderRadius: '1rem', padding: '0.6rem 0.8rem' }}>
+                <EmojiGroup count={currentSum.b} emoji={currentEmoji} />
+              </div>
+              <span style={{ fontSize: '2rem', color: '#555' }}>=</span>
+              <span style={{ fontSize: '2.5rem' }}>❓</span>
+            </div>
+          ) : (
+            <p style={{ ...font, fontSize: '3rem', fontWeight: 'bold', color: '#3E2009', margin: 0, textAlign: 'center' }}>
+              {currentSum.a} {opSymbol} {currentSum.b} = ?
+            </p>
+          )}
         </div>
       )}
 
       {/* Herhaal knop */}
       {currentSum && !answerResult && (
         <button
-          onClick={() => speakSum(currentSum.a, currentSum.b, currentSum.op)}
+          onClick={() => {
+            if (isVisual) {
+              speakItem('rekenen-tellen', 'Hoeveel zijn het samen?')
+            } else {
+              speakSum(currentSum.a, currentSum.b, currentSum.op)
+            }
+          }}
           style={{
             background: 'transparent',
             border: '2px solid #FFB74D',
@@ -275,14 +322,14 @@ export default function RekenGame({ savedProgress, onProgressUpdate, onBack }) {
       )}
 
       {/* Antwoord-opties */}
-      <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+      <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', justifyContent: 'center', paddingBottom: '5rem' }}>
         {options.map((opt, i) => {
           const isCorrect = currentSum && opt === currentSum.answer
           const isSelected = selectedOpt === opt
 
           let bg = 'white'
           let border = '2px solid #FFCC80'
-          if (answerResult && isCorrect)  { bg = '#C8E6C9'; border = '2px solid #4CAF50' }
+          if (answerResult && isCorrect)       { bg = '#C8E6C9'; border = '2px solid #4CAF50' }
           else if (answerResult && isSelected) { bg = '#FFCDD2'; border = '2px solid #F44336' }
 
           return (
@@ -292,30 +339,37 @@ export default function RekenGame({ savedProgress, onProgressUpdate, onBack }) {
               disabled={!!answerResult}
               style={{
                 ...font,
-                width: 100,
-                height: 100,
+                minWidth: levelDef.visual === 'full' ? 110 : 100,
+                minHeight: levelDef.visual === 'full' ? 110 : 100,
                 background: bg,
                 border,
                 borderRadius: '1.5rem',
-                fontSize: '2rem',
+                fontSize: levelDef.visual === 'full' ? '1rem' : '2rem',
                 fontWeight: 'bold',
                 color: '#3E2009',
                 cursor: answerResult ? 'default' : 'pointer',
                 boxShadow: '0 3px 10px rgba(0,0,0,0.08)',
                 transition: 'transform 0.1s',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: levelDef.visual === 'full' ? '0.6rem' : '0',
               }}
               onMouseDown={e => { if (!answerResult) e.currentTarget.style.transform = 'scale(0.93)' }}
               onMouseUp={e => { e.currentTarget.style.transform = 'scale(1)' }}
               onTouchStart={e => { if (!answerResult) e.currentTarget.style.transform = 'scale(0.93)' }}
               onTouchEnd={e => { e.currentTarget.style.transform = 'scale(1)' }}
             >
-              {opt}
+              {levelDef.visual === 'full'
+                ? <EmojiGroup count={opt} emoji={currentEmoji} />
+                : opt
+              }
             </button>
           )
         })}
       </div>
 
-      {/* Sami rechtsonder — klikbaar voor uitleg */}
+      {/* Sami rechtsonder */}
       <div
         style={{ position: 'fixed', bottom: 16, right: 16, cursor: 'pointer', textAlign: 'center' }}
         onClick={handleSamiPress}
